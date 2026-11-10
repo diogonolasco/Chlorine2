@@ -116,7 +116,7 @@ function createVipEmbed(guildId, guildName) {
         }
       )
       .setFooter({
-        text: 'Chlorine Music™ VIP • Servidor Oficial: discord.gg/6MFj275a3S',
+        text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
         iconURL: iconUrl || undefined
       });
 
@@ -168,7 +168,7 @@ function createVipEmbed(guildId, guildName) {
       }
     )
     .setFooter({
-      text: 'Chlorine Music™ VIP • Servidor Oficial: discord.gg/6MFj275a3S',
+      text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
       iconURL: iconUrl || undefined
     });
 
