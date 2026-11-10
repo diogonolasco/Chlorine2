@@ -1,3 +1,11 @@
+// Configura suporte a UTF-8 (emojis e acentos) no terminal Windows
+if (process.platform === 'win32') {
+  try {
+    const { execSync } = require('child_process');
+    execSync('chcp 65001', { stdio: 'ignore' });
+  } catch {}
+}
+
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -215,6 +223,16 @@ const client = new Client({
   ]
 });
 
+// Suporte opcional a cookies do YouTube via cookies.txt (se existir)
+const cookiesPath = path.join(__dirname, 'cookies.txt');
+let ytCookies = undefined;
+if (fs.existsSync(cookiesPath)) {
+  try {
+    const raw = fs.readFileSync(cookiesPath, 'utf8').trim();
+    if (raw) ytCookies = raw;
+  } catch {}
+}
+
 // Configuração do DisTube
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
@@ -222,7 +240,7 @@ const distube = new DisTube(client, {
     path: ffmpegStatic
   },
   plugins: [
-    new YouTubePlugin(),
+    new YouTubePlugin(ytCookies ? { cookies: ytCookies } : {}),
     new SpotifyPlugin(),
     new YtDlpPlugin()
   ]
@@ -1335,6 +1353,25 @@ distube.on('empty', (queue) => {
     .setColor(EMBED_COLOR)
     .setDescription('👋 **O canal de voz ficou vazio, saindo...**');
   queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+});
+
+// Depuração do FFmpeg (para monitorar alertas ou interrupções de stream)
+distube.on('ffmpegDebug', (msg) => {
+  if (/error|Error|403|failed|broken|exited/i.test(msg)) {
+    console.error(`${colors.yellow}⚠️ [FFmpeg]:${colors.reset} ${msg}`);
+  }
+});
+
+// Estabilizador de conexão de voz para evitar quedas prematuras de áudio
+client.on('voiceStateUpdate', (oldState, newState) => {
+  if (newState.id === client.user.id && newState.channelId) {
+    const queue = distube.getQueue(newState.guild.id);
+    if (queue?.voice?.connection && typeof queue.voice.connection.configureNetworking === 'function') {
+      try {
+        queue.voice.connection.configureNetworking();
+      } catch {}
+    }
+  }
 });
 
 // Tratamento de erros do DisTube
