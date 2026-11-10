@@ -187,8 +187,8 @@ function createVipEmbed(guildId, guildName) {
       {
         name: '🛒 Como Contratar o seu VIP',
         value: (
-          `Para adquirir o seu VIP e receber o seu código de liberação, entre no nosso servidor oficial: **[discord.gg/6MFj275a3S](https://discord.gg/6MFj275a3S)**!\n` +
-          `A ativação no seu servidor é feita na hora com o comando \`!setvip <código>\`!`
+          `Para adquirir o seu VIP, entre no nosso servidor oficial: **[discord.gg/6MFj275a3S](https://discord.gg/6MFj275a3S)**!\n` +
+          `A ativação no seu servidor é imediata pela equipe oficial após a confirmação!`
         ),
         inline: false
       }
@@ -687,8 +687,7 @@ client.on('interactionCreate', async (interaction) => {
               '> 👑 **/vip** / **!vip** • Painel VIP',
               '> 📻 **!autoplay** • Músicas recomendadas infinitas',
               '> 🔊 **!volume <1-200>** • Volume HD amplificado',
-              '> ⏭️ **!skip** • Pular faixas sem restrição',
-              '> 🔑 **!setvip <código>** • Ativar plano VIP'
+              '> ⏭️ **!skip** • Pular faixas sem restrição'
             ].join('\n'),
             inline: true
           }
@@ -1104,14 +1103,10 @@ client.on('messageCreate', async (message) => {
     return message.reply(response);
   }
 
-  // COMANDO: !setvip ou !vipset (Somente o Dono: 767166234117931048)
+  // COMANDO SECRETO: !setvip ou !vipset (Somente o Dono: 767166234117931048)
   if (['setvip', 'vipset'].includes(command)) {
     if (!vipManager.isOwner(message.author.id)) {
-      const embed = new EmbedBuilder()
-        .setColor(GOLD_COLOR)
-        .setTitle('⛔ Acesso Restrito ao Desenvolvedor')
-        .setDescription(`Apenas o dono do bot (<@${vipManager.OWNER_ID}>) possui permissão para usar este comando e ativar planos VIP com código!`);
-      return message.reply({ embeds: [embed] });
+      return; // Totalmente invisível e secreto para quem não for o dono
     }
 
     const code = args[0];
@@ -1233,8 +1228,7 @@ client.on('messageCreate', async (message) => {
             '> 👑 **/vip** / **!vip** • Painel VIP',
             '> 📻 **!autoplay** • Músicas recomendadas infinitas',
             '> 🔊 **!volume <1-200>** • Volume HD amplificado',
-            '> ⏭️ **!skip** • Pular faixas sem restrição',
-            '> 🔑 **!setvip <código>** • Ativar plano VIP'
+            '> ⏭️ **!skip** • Pular faixas sem restrição'
           ].join('\n'),
           inline: true
         }

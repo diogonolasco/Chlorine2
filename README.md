@@ -26,7 +26,6 @@ Bot completo de música para Discord desenvolvido em **Node.js** utilizando a bi
 | `!queue` | `!q`, `!fila` | Mostra as próximas músicas da fila |
 | `!nowplaying` | `!np`, `!tocando` | Mostra detalhes da música tocando agora |
 | `!vip` | `!premium` | Exibe os planos VIP ou status do VIP do servidor |
-| `!setvip <código>` | `!vipset` | Ativa o VIP no servidor via código *(Apenas Dono)* |
 | `!skip` *(VIP)* | `!s`, `!pular`, `!next` | Pula para a próxima música *(Exclusivo VIP)* |
 | `!volume <1-200>` *(VIP)* | `!vol`, `!v` | Ajusta o volume de 1% a 200% *(Exclusivo VIP)* |
 | `!autoplay` *(VIP)* | `!ap`, `!auto` | Liga/desliga reprodução contínua *(Exclusivo VIP)* |
