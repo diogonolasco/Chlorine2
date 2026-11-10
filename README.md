@@ -20,16 +20,30 @@ Bot completo de música para Discord desenvolvido em **Node.js** utilizando a bi
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
 | `!play <nome ou link>` | `!p` | Toca uma música pelo nome ou link |
-| `!skip` | `!s`, `!pular`, `!next` | Pula para a próxima música |
 | `!stop` | `!parar`, `!leave`, `!sair` | Para a música, esvazia a fila e sai da chamada |
 | `!pause` | `!pausar` | Pausa a música atual |
 | `!resume` | `!despausar`, `!continuar`, `!unpause` | Continua a música pausada |
-| `!autoplay` | `!ap`, `!auto` | Liga/desliga reprodução contínua automática |
 | `!queue` | `!q`, `!fila` | Mostra as próximas músicas da fila |
 | `!nowplaying` | `!np`, `!tocando` | Mostra detalhes da música tocando agora |
-| `!volume <1-100>` | `!vol`, `!v` | Ajusta o volume do áudio |
+| `!vip` | `!premium` | Exibe os planos VIP ou status do VIP do servidor |
+| `!setvip <código>` | `!vipset` | Ativa o VIP no servidor via código *(Apenas Dono)* |
+| `!skip` *(VIP)* | `!s`, `!pular`, `!next` | Pula para a próxima música *(Exclusivo VIP)* |
+| `!volume <1-200>` *(VIP)* | `!vol`, `!v` | Ajusta o volume de 1% a 200% *(Exclusivo VIP)* |
+| `!autoplay` *(VIP)* | `!ap`, `!auto` | Liga/desliga reprodução contínua *(Exclusivo VIP)* |
 | `!help` | `!ajuda`, `!comandos`, `!h` | Exibe o menu de ajuda completo |
 | `@Chlorine Music™` | *(menção)* | Card de boas-vindas com dados e botão de convite |
+
+---
+
+## 🌐 Painel de Controle Web (Localhost)
+
+Ao iniciar o bot, um painel moderno fica automaticamente disponível no seu navegador em:
+👉 **`http://localhost:3000`**
+
+- 🎛️ **Comandar o Bot pelo Site:** Dê play, pause, skip, ajuste o volume e veja a fila ao vivo.
+- 👑 **Gerenciador de Códigos VIP:** Gere chaves aleatórias nos planos de 7 dias, 15 dias, 30 dias, 90 dias ou 1 ano.
+- ⚡ **Ativação Direta:** Ative ou revogue VIP de servidores com 1 clique.
+- 🌍 **Monitoramento:** Acompanhe todos os servidores conectados e o ping do bot.
 
 ---
 

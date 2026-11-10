@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chlorine Music™ • Painel de Controle & Sistema VIP</title>
+  <link rel="icon" type="image/webp" href="/assets/chlorine_gold.webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Efeito de Fundo Luminoso Neon -->
+  <div class="bg-glow bg-glow-gold"></div>
+  <div class="bg-glow bg-glow-cyan"></div>
+
+  <!-- Barra Superior / Header -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <img src="/assets/chlorine_gold.webp" alt="Chlorine Music" class="brand-logo pulse-glow">
+      <div class="brand-text">
+        <h1>CHLORINE MUSIC<span>™</span></h1>
+        <p>PAINEL DE CONTROLE LOCALHOST & SISTEMA VIP</p>
+      </div>
+    </div>
+
+    <!-- Navegação de Abas -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="player">
+        <span class="icon">🎛️</span> Player & Músicas
+      </button>
+      <button class="tab-btn" data-tab="vip">
+        <span class="icon">👑</span> Sistema VIP
+      </button>
+      <button class="tab-btn" data-tab="guilds">
+        <span class="icon">🌍</span> Servidores (<span id="nav-guilds-count">0</span>)
+      </button>
+    </nav>
+
+    <!-- Indicador de Status do Bot -->
+    <div class="bot-badge" id="bot-badge">
+      <span class="status-dot"></span>
+      <div class="bot-info">
+        <span class="bot-name" id="bot-tag">Carregando...</span>
+        <span class="bot-ping" id="bot-ping">Ping: --ms</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="container">
+
+    <!-- ============================================== -->
+    <!-- ABA 1: PLAYER & CONTROLE DE MÚSICA -->
+    <!-- ============================================== -->
+    <section class="tab-content active" id="tab-player">
+      <!-- Seletor de Servidor -->
+      <div class="server-bar card">
+        <div class="server-bar-left">
+          <label for="server-select">🎮 <strong>Servidor Selecionado:</strong></label>
+          <select id="server-select" class="custom-select">
+            <option value="">Carregando servidores...</option>
+          </select>
+        </div>
+        <div class="server-bar-right" id="server-vip-badge">
+          <span class="badge badge-normal">Carregando...</span>
+        </div>
+      </div>
+
+      <div class="player-grid">
+        <!-- Card do Tocando Agora -->
+        <div class="card now-playing-card">
+          <div class="card-header">
+            <h3>🎵 Tocando Agora</h3>
+            <span class="queue-status-badge" id="player-status-badge">Parado</span>
+          </div>
+
+          <div class="track-info-container">
+            <div class="track-thumb-wrapper">
+              <img src="/assets/chlorine_gold.webp" alt="Capa" id="track-thumb" class="track-thumb">
+              <div class="soundwave" id="soundwave">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+
+            <div class="track-details">
+              <h2 id="track-title" class="track-title">Nenhuma música tocando no momento</h2>
+              <p class="track-meta" id="track-meta">Selecione um servidor e dê play abaixo!</p>
+              
+              <!-- Barra de Progresso do Áudio -->
+              <div class="progress-container">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <div class="progress-times">
+                  <span id="current-time">00:00</span>
+                  <span id="total-time">00:00</span>
+                </div>
+              </div>
+
+              <!-- Controles Interativos -->
+              <div class="player-controls">
+                <button class="ctrl-btn" id="btn-pause" title="Pausar / Despausar">
+                  <span id="pause-icon">⏸️</span>
+                </button>
+                <button class="ctrl-btn" id="btn-skip" title="Pular Faixa">
+                  <span>⏭️</span>
+                </button>
+                <button class="ctrl-btn btn-danger" id="btn-stop" title="Parar e Sair">
+                  <span>⏹️</span>
+                </button>
+                <button class="ctrl-btn btn-gold" id="btn-autoplay" title="Alternar Autoplay">
+                  <span>📻</span> <span id="autoplay-text">Autoplay</span>
+                </button>
+              </div>
+
+              <!-- Controle de Volume -->
+              <div class="volume-control">
+                <span>🔊 Volume: <strong id="volume-val">100%</strong></span>
+                <input type="range" id="volume-slider" min="1" max="150" value="100" class="custom-slider">
+              </div>
+            </div>
+          </div>
+
+          <!-- Tocar Nova Música no Servidor -->
+          <div class="quick-play-box">
+            <h4>⚡ Tocar Música pelo Painel:</h4>
+            <div class="quick-play-form">
+              <input type="text" id="quick-play-input" class="custom-input" placeholder="Digite o nome da música ou link do YouTube/Spotify...">
+              <select id="quick-play-voice" class="custom-select voice-select">
+                <option value="">Canal de voz automático</option>
+              </select>
+              <button class="btn btn-primary" id="btn-quick-play">
+                <span>▶️ Tocar Agora</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila de Reprodução -->
+        <div class="card queue-card">
+          <div class="card-header">
+            <h3>📜 Fila de Espera (<span id="queue-count">0</span>)</h3>
+            <button class="btn btn-sm btn-outline" id="btn-refresh-queue">🔄 Atualizar</button>
+          </div>
+          <div class="queue-list" id="queue-list">
+            <div class="empty-state">
+              <span>🎵</span>
+              <p>Nenhuma música na fila deste servidor.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- ABA 2: SISTEMA VIP -->
+    <!-- ============================================== -->
+    <section class="tab-content" id="tab-vip">
+      <!-- Top Banner Dourado VIP -->
+      <div class="vip-banner-card card">
+        <img src="/assets/chlorine_gold.webp" alt="Chlorine VIP" class="vip-banner-img pulse-glow">
+        <div class="vip-banner-content">
+          <h2>👑 SISTEMA VIP CHLORINE MUSIC™</h2>
+          <p>
+            Gere códigos de ativação únicos para seus clientes, ative o VIP diretamente em qualquer servidor conectado ou gerencie o tempo de duração restante.
+          </p>
+          <div class="vip-perks-pills">
+            <span class="pill-gold">📻 Autoplay Automático</span>
+            <span class="pill-gold">🔊 Volume até 200%</span>
+            <span class="pill-gold">⏭️ Skip Ilimitado</span>
+            <span class="pill-gold">⚡ Buffer de Áudio HD Prioritário</span>
+            <span class="pill-gold">👑 Embed Dourado Exclusivo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="vip-grid">
+        <!-- 1. Gerador de Códigos VIP -->
+        <div class="card vip-generator-card">
+          <div class="card-header">
+            <h3>✨ Gerador de Códigos VIP</h3>
+            <span class="badge badge-gold">Comando: !setvip</span>
+          </div>
+          <p class="section-desc">
+            Selecione o plano desejado para gerar um código aleatório exclusivo. Em seguida, use o comando <code>!setvip &lt;codigo&gt;</code> no servidor do Discord para ativá-lo!
+          </p>
+
+          <div class="form-group">
+            <label for="plan-select">💎 <strong>Selecione o Plano:</strong></label>
+            <div class="plans-grid" id="plans-selector-grid">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="key-note">📝 <strong>Anotação / Nome do Cliente (Opcional):</strong></label>
+            <input type="text" id="key-note" class="custom-input" placeholder="Ex: Cliente João (Discord) - Comprovante Pix">
+          </div>
+
+          <button class="btn btn-gold btn-lg w-100" id="btn-generate-key">
+            <span>👑 Gerar Código VIP</span>
+          </button>
+
+          <!-- Caixa de Exibição do Código Gerado -->
+          <div class="generated-box" id="generated-box" style="display: none;">
+            <span class="gen-title">🎉 Código VIP Gerado com Sucesso!</span>
+            <div class="code-wrapper">
+              <input type="text" id="generated-code-display" readonly class="code-input">
+              <button class="btn btn-cyan" id="btn-copy-code">📋 Copiar</button>
+            </div>
+            <p class="gen-instruction">
+              💡 <strong>Instrução:</strong> Vá no canal de texto do servidor onde o bot está e digite:<br>
+              <code id="gen-command-example">!setvip CHLORINE-VIP-...</code>
+            </p>
+          </div>
+        </div>
+
+        <!-- 2. Ativação Direta em Servidores -->
+        <div class="card vip-direct-card">
+          <div class="card-header">
+            <h3>⚡ Ativação Rápida Direta</h3>
+            <span class="badge badge-cyan">Sem Código</span>
+          </div>
+          <p class="section-desc">
+            Ative o VIP instantaneamente em um servidor conectado, sem precisar digitar código no chat do Discord.
+          </p>
+
+          <div class="form-group">
+            <label for="direct-guild-select">🌍 <strong>Escolha o Servidor:</strong></label>
+            <select id="direct-guild-select" class="custom-select">
+              <option value="">Carregando servidores...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="direct-plan-select">💎 <strong>Plano:</strong></label>
+            <select id="direct-plan-select" class="custom-select">
+              <option value="7d">Plano Bronze (7 Dias) • R$ 4,90</option>
+              <option value="15d">Plano Prata (15 Dias) • R$ 8,90</option>
+              <option value="30d" selected>Plano Ouro (30 Dias) • R$ 14,90 (Popular ⭐)</option>
+              <option value="90d">Plano Platina (90 Dias) • R$ 34,90</option>
+              <option value="365d">Plano Supremo (1 Ano) • R$ 79,90 (Melhor Valor 🚀)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="direct-note">📝 <strong>Anotação:</strong></label>
+            <input type="text" id="direct-note" class="custom-input" placeholder="Ex: Ativação manual direta">
+          </div>
+
+          <button class="btn btn-primary w-100" id="btn-direct-activate">
+            <span>✨ Ativar VIP Imediatamente</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabela 1: Servidores VIP Ativos -->
+      <div class="card mt-20">
+        <div class="card-header">
+          <h3>👑 Servidores com VIP Ativo</h3>
+          <button class="btn btn-sm btn-outline" id="btn-refresh-vips">🔄 Atualizar</button>
+        </div>
+        <div class="table-responsive">
+          <table class="custom-table" id="table-vip-guilds">
+            <thead>
+              <tr>
+                <th>Servidor</th>
+                <th>Plano</th>
+                <th>Tempo Restante</th>
+                <th>Vencimento</th>
+                <th>Ativação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="vip-guilds-tbody">
+              <tr>
+                <td colspan="6" class="text-center">Nenhum servidor VIP ativo no momento.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tabela 2: Chaves / Códigos VIP Criados -->
+      <div class="card mt-20">
+        <div class="card-header">
+          <h3>🔑 Histórico de Códigos VIP Gerados</h3>
+          <button class="btn btn-sm btn-outline" id="btn-refresh-keys">🔄 Atualizar</button>
+        </div>
+        <div class="table-responsive">
+          <table class="custom-table" id="table-vip-keys">
+            <thead>
+              <tr>
+                <th>Código VIP</th>
+                <th>Plano</th>
+                <th>Duração</th>
+                <th>Status</th>
+                <th>Servidor Onde Foi Usado</th>
+                <th>Anotação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="vip-keys-tbody">
+              <tr>
+                <td colspan="7" class="text-center">Nenhuma chave gerada ainda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- ABA 3: SERVIDORES CONECTADOS -->
+    <!-- ============================================== -->
+    <section class="tab-content" id="tab-guilds">
+      <div class="card">
+        <div class="card-header">
+          <h3>🌍 Servidores Conectados ao Chlorine Music™</h3>
+          <span class="badge badge-cyan" id="guilds-total-badge">0 Servidores</span>
+        </div>
+        <p class="section-desc">
+          Lista de todos os servidores do Discord onde o bot está presente.
+        </p>
+        <div class="guilds-grid" id="guilds-grid-container">
+          <!-- Renderizado dinamicamente -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notificação Toast Flutuante -->
+  <div class="toast" id="toast">Notificação</div>
+
+  <footer class="footer">
+    <p>© 2026 <strong>Chlorine Music™</strong> • Desenvolvido por <strong>.nolasco7</strong> (ID: <code>767166234117931048</code>)</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
