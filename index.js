@@ -54,14 +54,26 @@ function createMusicRow(requesterId, isPaused = false) {
 function createVipEmbed(guildId, guildName) {
   const isVip = vipManager.isGuildVip(guildId);
   const vipInfo = vipManager.getGuildVipInfo(guildId);
-  const goldImagePath = path.join(__dirname, 'assets', 'chlorine_gold.webp');
+  const assetsDir = path.join(__dirname, 'assets');
   const files = [];
 
   let iconUrl = null;
-  if (fs.existsSync(goldImagePath)) {
-    const attachment = new AttachmentBuilder(goldImagePath, { name: 'chlorine_gold.webp' });
-    files.push(attachment);
+  const iconePremiumPath = path.join(assetsDir, 'iconepremium.png');
+  const goldImagePath = path.join(assetsDir, 'chlorine_gold.webp');
+  const bannerPath = path.join(assetsDir, 'banner.png');
+
+  if (fs.existsSync(iconePremiumPath)) {
+    files.push(new AttachmentBuilder(iconePremiumPath, { name: 'iconepremium.png' }));
+    iconUrl = 'attachment://iconepremium.png';
+  } else if (fs.existsSync(goldImagePath)) {
+    files.push(new AttachmentBuilder(goldImagePath, { name: 'chlorine_gold.webp' }));
     iconUrl = 'attachment://chlorine_gold.webp';
+  }
+
+  let bannerUrl = null;
+  if (fs.existsSync(bannerPath)) {
+    files.push(new AttachmentBuilder(bannerPath, { name: 'vip_banner.png' }));
+    bannerUrl = 'attachment://vip_banner.png';
   }
 
   if (isVip && vipInfo) {
@@ -109,6 +121,9 @@ function createVipEmbed(guildId, guildName) {
     if (iconUrl) {
       embed.setThumbnail(iconUrl);
     }
+    if (bannerUrl) {
+      embed.setImage(bannerUrl);
+    }
 
     return { embeds: [embed], files };
   }
@@ -147,9 +162,9 @@ function createVipEmbed(guildId, guildName) {
       {
         name: '🛒 Como Contratar o seu VIP',
         value: (
-          `Para adquirir o seu VIP e receber o seu código de liberação, entre em contato diretamente com o criador ` +
-          `**.nolasco7** (<@${vipManager.OWNER_ID}>) ou entre no servidor oficial do bot!\n` +
-          `A ativação no servidor é feita na hora com o comando \`!setvip <código>\`!`
+          `Para adquirir o seu VIP e receber o seu código de liberação, entre no servidor oficial do Chlorine: ` +
+          `**[discord.gg/6MFj275a3S](https://discord.gg/6MFj275a3S)** ou fale com o criador **.nolasco7** (<@${vipManager.OWNER_ID}>)!\n` +
+          `A ativação no seu servidor é feita na hora com o comando \`!setvip <código>\`!`
         ),
         inline: false
       }
@@ -162,8 +177,11 @@ function createVipEmbed(guildId, guildName) {
   if (iconUrl) {
     embed.setThumbnail(iconUrl);
   }
+  if (bannerUrl) {
+    embed.setImage(bannerUrl);
+  }
 
-  const supportUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/chlorine';
+  const supportUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/6MFj275a3S';
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setLabel('👑 Comprar VIP / Falar com Criador')
@@ -691,7 +709,7 @@ client.on('interactionCreate', async (interaction) => {
   // Botão de Contato VIP
   if (interaction.customId === 'vip_contact_info') {
     return interaction.reply({
-      content: `👑 Para contratar o seu plano VIP, mande uma mensagem privada para o desenvolvedor **.nolasco7** (ID: \`${vipManager.OWNER_ID}\`) ou entre no servidor oficial!`,
+      content: `👑 Para contratar o seu plano VIP, entre no servidor oficial da Chlorine: **https://discord.gg/6MFj275a3S** ou mande uma mensagem privada para o desenvolvedor **.nolasco7** (ID: \`${vipManager.OWNER_ID}\`)!`,
       ephemeral: true
     });
   }
