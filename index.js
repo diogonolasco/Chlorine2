@@ -29,6 +29,32 @@ const PREFIX = '!';
 const EMBED_COLOR = 0x00D8E6; // Cyan Neon
 const GOLD_COLOR = 0xFFD700;  // Dourado VIP
 
+// Controle de aviso único para usuários que tentam comandos bloqueados sem VIP
+// Notifica o usuário APENAS UMA VEZ; tentativas posteriores são ignoradas sem resposta
+const warnedNonVipUsers = new Set();
+
+function notifyNonVipOnce(userId, replyFn) {
+  if (warnedNonVipUsers.has(userId)) {
+    // Já foi avisado anteriormente: não responde mais nada sobre comprar VIP
+    return false;
+  }
+  warnedNonVipUsers.add(userId);
+
+  const embed = new EmbedBuilder()
+    .setColor(GOLD_COLOR)
+    .setTitle('🔒 Comando Exclusivo VIP!')
+    .setDescription(
+      'Os comandos **!skip**, **!volume** e **!autoplay** são exclusivos para servidores com plano **Chlorine VIP**!\n\n' +
+      'Digite **!vip** ou use **/vip** para conhecer os planos e liberar para o seu servidor!'
+    )
+    .setFooter({
+      text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7'
+    });
+
+  replyFn({ embeds: [embed] });
+  return true;
+}
+
 // Função geradora dos botões do player (Sem o botão embaralhar, conforme solicitado)
 function createMusicRow(requesterId, isPaused = false) {
   return new ActionRowBuilder().addComponents(
@@ -220,7 +246,7 @@ function renderBoxLine(label, value, totalWidth = 56) {
   return `  ║  ${label} ${value}${' '.repeat(spaces)}║`;
 }
 
-// Definição dos Slash Commands (Comandos de barra /) para aparecerem no perfil do bot
+// Definição dos Slash Commands (Comandos de barra /) - Apenas os 3 comandos principais
 const slashCommands = [
   new SlashCommandBuilder()
     .setName('play')
@@ -231,47 +257,8 @@ const slashCommands = [
         .setRequired(true)
     ),
   new SlashCommandBuilder()
-    .setName('skip')
-    .setDescription('Pula imediatamente para a próxima música da fila'),
-  new SlashCommandBuilder()
-    .setName('stop')
-    .setDescription('Para a música, limpa a fila e sai da chamada de voz'),
-  new SlashCommandBuilder()
-    .setName('pause')
-    .setDescription('Pausa a música que está tocando no momento'),
-  new SlashCommandBuilder()
-    .setName('resume')
-    .setDescription('Retoma a reprodução da música pausada'),
-  new SlashCommandBuilder()
-    .setName('autoplay')
-    .setDescription('Liga ou desliga a reprodução automática de músicas semelhantes'),
-  new SlashCommandBuilder()
-    .setName('queue')
-    .setDescription('Exibe a lista com as próximas músicas na fila'),
-  new SlashCommandBuilder()
-    .setName('nowplaying')
-    .setDescription('Exibe detalhes e botões da música tocando agora'),
-  new SlashCommandBuilder()
-    .setName('volume')
-    .setDescription('Ajusta o volume do áudio do bot (Exclusivo VIP)')
-    .addIntegerOption(opt =>
-      opt.setName('nivel')
-        .setDescription('Nível de volume de 1 a 200')
-        .setMinValue(1)
-        .setMaxValue(200)
-        .setRequired(true)
-    ),
-  new SlashCommandBuilder()
     .setName('vip')
     .setDescription('Exibe o status VIP do servidor ou consulte os planos e vantagens exclusivas'),
-  new SlashCommandBuilder()
-    .setName('setvip')
-    .setDescription('Ativa o plano VIP no servidor através de um código de ativação (Apenas Dono)')
-    .addStringOption(opt =>
-      opt.setName('codigo')
-        .setDescription('Código de ativação gerado no Painel Web')
-        .setRequired(true)
-    ),
   new SlashCommandBuilder()
     .setName('help')
     .setDescription('Exibe o painel de comandos e ajuda')
@@ -323,9 +310,13 @@ client.once('clientReady', async () => {
     console.error('Erro ao sincronizar comandos de barra:', err);
   }
 
-  client.user.setActivity({
-    name: '!play ou /play | Música',
-    type: ActivityType.Listening
+  client.user.setPresence({
+    activities: [{
+      name: '!play ou /play | Música',
+      type: ActivityType.Custom,
+      state: '!play ou /play | Música'
+    }],
+    status: 'online'
   });
 });
 
@@ -365,13 +356,20 @@ client.on('interactionCreate', async (interaction) => {
     // /skip
     if (commandName === 'skip') {
       if (!vipManager.isGuildVip(interaction.guildId)) {
+        if (warnedNonVipUsers.has(interaction.user.id)) {
+          return interaction.reply({ content: '🔒 Comando exclusivo para servidores VIP.', ephemeral: true });
+        }
+        warnedNonVipUsers.add(interaction.user.id);
         const embed = new EmbedBuilder()
           .setColor(GOLD_COLOR)
           .setTitle('🔒 Comando Exclusivo VIP!')
           .setDescription(
             '⏭️ O comando de **Pular Músicas (/skip)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n' +
             'Digite `/vip` ou `!vip` para conhecer os planos e liberar para o seu servidor!'
-          );
+          )
+          .setFooter({
+            text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7'
+          });
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -454,13 +452,20 @@ client.on('interactionCreate', async (interaction) => {
     // /autoplay
     if (commandName === 'autoplay') {
       if (!vipManager.isGuildVip(interaction.guildId)) {
+        if (warnedNonVipUsers.has(interaction.user.id)) {
+          return interaction.reply({ content: '🔒 Modo Autoplay exclusivo para servidores VIP.', ephemeral: true });
+        }
+        warnedNonVipUsers.add(interaction.user.id);
         const embed = new EmbedBuilder()
           .setColor(GOLD_COLOR)
           .setTitle('🔒 Comando Exclusivo VIP!')
           .setDescription(
             '📻 O modo **Autoplay Automático** (músicas semelhantes infinitas) é um recurso exclusivo para servidores **Chlorine VIP**!\n\n' +
             'Digite `/vip` ou `!vip` para conhecer os planos e liberar para o seu servidor!'
-          );
+          )
+          .setFooter({
+            text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7'
+          });
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -529,13 +534,20 @@ client.on('interactionCreate', async (interaction) => {
     // /volume
     if (commandName === 'volume') {
       if (!vipManager.isGuildVip(interaction.guildId)) {
+        if (warnedNonVipUsers.has(interaction.user.id)) {
+          return interaction.reply({ content: '🔒 Controle de volume exclusivo para servidores VIP.', ephemeral: true });
+        }
+        warnedNonVipUsers.add(interaction.user.id);
         const embed = new EmbedBuilder()
           .setColor(GOLD_COLOR)
           .setTitle('🔒 Comando Exclusivo VIP!')
           .setDescription(
             '🔊 O controle de **Volume Personalizado** (1% a 200%) é um recurso exclusivo para servidores **Chlorine VIP**!\n\n' +
             'Digite `/vip` ou `!vip` para liberar o volume para o seu servidor!'
-          );
+          )
+          .setFooter({
+            text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7'
+          });
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -643,37 +655,46 @@ client.on('interactionCreate', async (interaction) => {
       const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
         .setAuthor({
-          name: 'Chlorine Music™ • Comandos',
+          name: 'Chlorine Music™ • Central de Ajuda & Comandos',
           iconURL: iconUrl
         })
         .setThumbnail(iconUrl)
         .setDescription('Prefixo no servidor: `!` ou use os comandos de barra `/`')
         .addFields(
           {
-            name: '🎵 Músicas & Fila',
+            name: '🚀 Comandos de Barra Principais (/)',
             value: [
-              '> ▶️ **!play** • `!p` • `/play`',
-              '> ⏭️ **!skip** • `!s` • `/skip`',
-              '> ⏹️ **!stop** • `!sair` • `/stop`',
-              '> ⏸️ **!pause** • `/pause`',
-              '> ⏯️ **!resume** • `/resume`'
+              '> ▶️ **/play <música>** • Tocar qualquer música ou link',
+              '> 👑 **/vip** • Ver vantagens, planos e status VIP',
+              '> ❓ **/help** • Exibir este painel de comandos e ajuda'
+            ].join('\n'),
+            inline: false
+          },
+          {
+            name: '🎵 Controles do Player (Chat / Botões)',
+            value: [
+              '> ⏸️ **!pause** • Pausar música',
+              '> ⏯️ **!resume** • Continuar música',
+              '> ⏹️ **!stop** • Parar e limpar fila',
+              '> 📜 **!queue** • Ver próximas da fila',
+              '> 🔍 **!nowplaying** • Música tocando agora'
             ].join('\n'),
             inline: true
           },
           {
-            name: '🎛️ Controles & Sistema',
+            name: '👑 Comandos Exclusivos VIP',
             value: [
-              '> 📻 **!autoplay** • `/autoplay`',
-              '> 📜 **!queue** • `!q` • `/queue`',
-              '> 🔍 **!nowplaying** • `/nowplaying`',
-              '> 🔊 **!volume** • `/volume`',
-              '> ❓ **!help** • `/help`'
+              '> 👑 **/vip** / **!vip** • Painel VIP',
+              '> 📻 **!autoplay** • Músicas recomendadas infinitas',
+              '> 🔊 **!volume <1-200>** • Volume HD amplificado',
+              '> ⏭️ **!skip** • Pular faixas sem restrição',
+              '> 🔑 **!setvip <código>** • Ativar plano VIP'
             ].join('\n'),
             inline: true
           }
         )
         .setFooter({
-          text: '© 2026 Chlorine Music™ • Qualidade Sonora em Primeiro Lugar',
+          text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
           iconURL: iconUrl
         });
 
@@ -732,8 +753,13 @@ client.on('interactionCreate', async (interaction) => {
   // Ação: Pular
   if (rawAction === 'skip') {
     if (!vipManager.isGuildVip(interaction.guildId)) {
+      if (warnedNonVipUsers.has(interaction.user.id)) {
+        // Já foi avisado: silencia sem reexibir mensagem sobre comprar VIP
+        return interaction.deferUpdate().catch(() => {});
+      }
+      warnedNonVipUsers.add(interaction.user.id);
       return interaction.reply({
-        content: '🔒 O comando de **Pular Músicas** é exclusivo para servidores **VIP**! Digite `!vip` no chat para conhecer os planos e liberar.',
+        content: '🔒 O comando de **Pular Músicas** é exclusivo para servidores com plano **Chlorine VIP**! Digite `!vip` ou `/vip` no chat para conhecer os planos e liberar.',
         ephemeral: true
       });
     }
@@ -881,14 +907,8 @@ client.on('messageCreate', async (message) => {
   // COMANDO: !skip (ou !s, !pular, !next)
   if (['skip', 's', 'pular', 'next'].includes(command)) {
     if (!vipManager.isGuildVip(message.guild.id)) {
-      const embed = new EmbedBuilder()
-        .setColor(GOLD_COLOR)
-        .setTitle('🔒 Comando Exclusivo VIP!')
-        .setDescription(
-          '⏭️ O comando de **Pular Músicas (!skip)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n' +
-          'Digite **!vip** para conhecer os planos e liberar para o seu servidor!'
-        );
-      return message.reply({ embeds: [embed] });
+      notifyNonVipOnce(message.author.id, (payload) => message.reply(payload));
+      return;
     }
 
     const queue = distube.getQueue(message);
@@ -1022,14 +1042,8 @@ client.on('messageCreate', async (message) => {
   // COMANDO: !volume (ou !vol, !v)
   if (['volume', 'vol', 'v'].includes(command)) {
     if (!vipManager.isGuildVip(message.guild.id)) {
-      const embed = new EmbedBuilder()
-        .setColor(GOLD_COLOR)
-        .setTitle('🔒 Comando Exclusivo VIP!')
-        .setDescription(
-          '🔊 O controle de **Volume Personalizado** (1% a 200%) é um recurso exclusivo para servidores **Chlorine VIP**!\n\n' +
-          'Digite **!vip** para desbloquear o volume personalizado e outros comandos exclusivos!'
-        );
-      return message.reply({ embeds: [embed] });
+      notifyNonVipOnce(message.author.id, (payload) => message.reply(payload));
+      return;
     }
 
     const queue = distube.getQueue(message);
@@ -1061,14 +1075,8 @@ client.on('messageCreate', async (message) => {
   // COMANDO: !autoplay (ou !ap, !auto)
   if (['autoplay', 'ap', 'auto'].includes(command)) {
     if (!vipManager.isGuildVip(message.guild.id)) {
-      const embed = new EmbedBuilder()
-        .setColor(GOLD_COLOR)
-        .setTitle('🔒 Comando Exclusivo VIP!')
-        .setDescription(
-          '📻 O modo **Autoplay Automático** (músicas semelhantes infinitas) é um recurso exclusivo para servidores **Chlorine VIP**!\n\n' +
-          'Digite **!vip** para ver os planos e falar com o desenvolvedor do bot!'
-        );
-      return message.reply({ embeds: [embed] });
+      notifyNonVipOnce(message.author.id, (payload) => message.reply(payload));
+      return;
     }
 
     const queue = distube.getQueue(message);
@@ -1193,46 +1201,46 @@ client.on('messageCreate', async (message) => {
     const embed = new EmbedBuilder()
       .setColor(0x00D8E6)
       .setAuthor({
-        name: 'Chlorine Music™ • Comandos',
+        name: 'Chlorine Music™ • Central de Ajuda & Comandos',
         iconURL: iconUrl
       })
       .setThumbnail(iconUrl)
-      .setDescription('Prefixo no servidor: `!` • Use o comando principal ou as abreviações:')
+      .setDescription('Prefixo no servidor: `!` ou use os comandos de barra `/`')
       .addFields(
         {
-          name: '🎵 Músicas & Fila',
+          name: '🚀 Comandos de Barra Principais (/)',
           value: [
-            '> ▶️ **!play** • `!p`',
-            '> ⏭️ **!skip** • `!s` `!next` `!pular` *(VIP)*',
-            '> ⏹️ **!stop** • `!sair` `!parar` `!leave`',
-            '> ⏸️ **!pause** • `!pausar`',
-            '> ⏯️ **!resume** • `!continuar` `!unpause`'
-          ].join('\n'),
-          inline: true
-        },
-        {
-          name: '🎛️ Controles & Sistema',
-          value: [
-            '> 📜 **!queue** • `!q` `!fila`',
-            '> 🔍 **!nowplaying** • `!np` `!tocando`',
-            '> ❓ **!help** • `!ajuda` `!h`'
-          ].join('\n'),
-          inline: true
-        },
-        {
-          name: '👑 Sistema VIP (Dourado)',
-          value: [
-            '> 👑 **!vip** • Informações, planos e status VIP',
-            '> 📻 **!autoplay** • Autoplay infinito de músicas *(VIP)*',
-            '> 🔊 **!volume <1-200>** • Controle de volume HD amplificado *(VIP)*',
-            '> ⏭️ **!skip** • Pular faixas sem restrição *(VIP)*',
-            '> 🔑 **!setvip <código>** • Ativar plano VIP via chave *(Dono)*'
+            '> ▶️ **/play <música>** • Tocar qualquer música ou link',
+            '> 👑 **/vip** • Ver vantagens, planos e status VIP',
+            '> ❓ **/help** • Exibir este painel de comandos e ajuda'
           ].join('\n'),
           inline: false
+        },
+        {
+          name: '🎵 Controles do Player (Chat / Botões)',
+          value: [
+            '> ⏸️ **!pause** • Pausar música',
+            '> ⏯️ **!resume** • Continuar música',
+            '> ⏹️ **!stop** • Parar e limpar fila',
+            '> 📜 **!queue** • Ver próximas da fila',
+            '> 🔍 **!nowplaying** • Música tocando agora'
+          ].join('\n'),
+          inline: true
+        },
+        {
+          name: '👑 Comandos Exclusivos VIP',
+          value: [
+            '> 👑 **/vip** / **!vip** • Painel VIP',
+            '> 📻 **!autoplay** • Músicas recomendadas infinitas',
+            '> 🔊 **!volume <1-200>** • Volume HD amplificado',
+            '> ⏭️ **!skip** • Pular faixas sem restrição',
+            '> 🔑 **!setvip <código>** • Ativar plano VIP'
+          ].join('\n'),
+          inline: true
         }
       )
       .setFooter({
-        text: '© 2026 Chlorine Music™ • Qualidade Sonora em Primeiro Lugar',
+        text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
         iconURL: iconUrl
       });
 
