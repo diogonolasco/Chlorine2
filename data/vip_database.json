@@ -1,4 +1,31 @@
 {
-  "keys": {},
-  "guilds": {}
+  "keys": {
+    "CHLORINE-VIP-365D-18B92D-79742F": {
+      "code": "CHLORINE-VIP-365D-18B92D-79742F",
+      "planId": "365d",
+      "planName": "Plano Supremo (1 Ano)",
+      "durationDays": 365,
+      "createdAt": 1794281408200,
+      "createdBy": "Dashboard Localhost",
+      "note": "Crimson Knights",
+      "used": true,
+      "usedBy": "767166234117931048",
+      "usedInGuildId": "958350490452774913",
+      "usedInGuildName": "Crimson Knights",
+      "usedAt": 1794281420015
+    }
+  },
+  "guilds": {
+    "958350490452774913": {
+      "guildId": "958350490452774913",
+      "guildName": "Crimson Knights",
+      "planId": "365d",
+      "planName": "Plano Supremo (1 Ano)",
+      "durationDays": 365,
+      "activatedAt": 1794281420015,
+      "expiresAt": 1825817420015,
+      "activatedBy": "767166234117931048",
+      "keyCode": "CHLORINE-VIP-365D-18B92D-79742F"
+    }
+  }
 }

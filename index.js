@@ -60,7 +60,6 @@ function createVipEmbed(guildId, guildName) {
   let iconUrl = null;
   const iconePremiumPath = path.join(assetsDir, 'iconepremium.png');
   const goldImagePath = path.join(assetsDir, 'chlorine_gold.webp');
-  const bannerPath = path.join(assetsDir, 'banner.png');
 
   if (fs.existsSync(iconePremiumPath)) {
     files.push(new AttachmentBuilder(iconePremiumPath, { name: 'iconepremium.png' }));
@@ -70,11 +69,14 @@ function createVipEmbed(guildId, guildName) {
     iconUrl = 'attachment://chlorine_gold.webp';
   }
 
-  let bannerUrl = null;
-  if (fs.existsSync(bannerPath)) {
-    files.push(new AttachmentBuilder(bannerPath, { name: 'vip_banner.png' }));
-    bannerUrl = 'attachment://vip_banner.png';
-  }
+  const supportUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/6MFj275a3S';
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('Entrar no Servidor Oficial')
+      .setStyle(ButtonStyle.Link)
+      .setURL(supportUrl)
+      .setEmoji('👑')
+  );
 
   if (isVip && vipInfo) {
     // Servidor POSSUI VIP Ativo
@@ -114,18 +116,15 @@ function createVipEmbed(guildId, guildName) {
         }
       )
       .setFooter({
-        text: 'Chlorine Music™ VIP • Agradecemos por apoiar nosso bot!',
+        text: 'Chlorine Music™ VIP • Servidor Oficial: discord.gg/6MFj275a3S',
         iconURL: iconUrl || undefined
       });
 
     if (iconUrl) {
       embed.setThumbnail(iconUrl);
     }
-    if (bannerUrl) {
-      embed.setImage(bannerUrl);
-    }
 
-    return { embeds: [embed], files };
+    return { embeds: [embed], files, components: [row] };
   }
 
   // Servidor NÃO possui VIP
@@ -144,7 +143,7 @@ function createVipEmbed(guildId, guildName) {
           '> 🔊 **!volume / !vol** • Controle de volume amplificado HD de 1% a 200%!',
           '> ⏭️ **!skip / !s** • Pule músicas sem votação ou restrições!',
           '> ⚡ **Buffer Prioritário** • Áudio sem travamentos ou lentidão!',
-          '> 👑 **Suporte VIP Exclusivo** • Atendimento rápido com o criador.'
+          '> 👑 **Suporte VIP Exclusivo** • Atendimento prioritário no servidor oficial.'
         ].join('\n'),
         inline: false
       },
@@ -162,38 +161,20 @@ function createVipEmbed(guildId, guildName) {
       {
         name: '🛒 Como Contratar o seu VIP',
         value: (
-          `Para adquirir o seu VIP e receber o seu código de liberação, entre no servidor oficial do Chlorine: ` +
-          `**[discord.gg/6MFj275a3S](https://discord.gg/6MFj275a3S)** ou fale com o criador **.nolasco7** (<@${vipManager.OWNER_ID}>)!\n` +
+          `Para adquirir o seu VIP e receber o seu código de liberação, entre no nosso servidor oficial: **[discord.gg/6MFj275a3S](https://discord.gg/6MFj275a3S)**!\n` +
           `A ativação no seu servidor é feita na hora com o comando \`!setvip <código>\`!`
         ),
         inline: false
       }
     )
     .setFooter({
-      text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
+      text: 'Chlorine Music™ VIP • Servidor Oficial: discord.gg/6MFj275a3S',
       iconURL: iconUrl || undefined
     });
 
   if (iconUrl) {
     embed.setThumbnail(iconUrl);
   }
-  if (bannerUrl) {
-    embed.setImage(bannerUrl);
-  }
-
-  const supportUrl = process.env.SUPPORT_SERVER_URL || 'https://discord.gg/6MFj275a3S';
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel('👑 Comprar VIP / Falar com Criador')
-      .setStyle(ButtonStyle.Link)
-      .setURL(supportUrl)
-      .setEmoji('🛒'),
-    new ButtonBuilder()
-      .setCustomId('vip_contact_info')
-      .setLabel('Contato: .nolasco7')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('💬')
-  );
 
   return { embeds: [embed], files, components: [row] };
 }
@@ -692,7 +673,7 @@ client.on('interactionCreate', async (interaction) => {
           }
         )
         .setFooter({
-          text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
+          text: '© 2026 Chlorine Music™ • Qualidade Sonora em Primeiro Lugar',
           iconURL: iconUrl
         });
 
@@ -706,10 +687,10 @@ client.on('interactionCreate', async (interaction) => {
   // ============================================
   if (!interaction.isButton()) return;
 
-  // Botão de Contato VIP
+  // Botão de Contato VIP (legado para mensagens antigas)
   if (interaction.customId === 'vip_contact_info') {
     return interaction.reply({
-      content: `👑 Para contratar o seu plano VIP, entre no servidor oficial da Chlorine: **https://discord.gg/6MFj275a3S** ou mande uma mensagem privada para o desenvolvedor **.nolasco7** (ID: \`${vipManager.OWNER_ID}\`)!`,
+      content: `👑 Para contratar o seu plano VIP, entre no servidor oficial da Chlorine: **https://discord.gg/6MFj275a3S**!`,
       ephemeral: true
     });
   }
@@ -1251,7 +1232,7 @@ client.on('messageCreate', async (message) => {
         }
       )
       .setFooter({
-        text: '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7',
+        text: '© 2026 Chlorine Music™ • Qualidade Sonora em Primeiro Lugar',
         iconURL: iconUrl
       });
 
