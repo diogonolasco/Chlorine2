@@ -36,10 +36,7 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
 | `!play <nome ou link>` | `!p` | Toca uma música ou adiciona à fila |
-| `!pause` | `!pausar` | Pausa a reprodução atual |
-| `!resume` | `!despausar`, `!continuar`, `!unpause` | Retoma a música pausada |
 | `!stop` | `!parar`, `!leave`, `!sair` | Para a música, limpa a fila e desconecta da chamada |
-| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada com menu interativo ou pula direto para o número escolhido (removendo as anteriores) |
 | `!nowplaying` | `!np`, `!tocando` | Exibe detalhes e controles da faixa atual |
 | `!vip` | `!premium` | Mostra os planos VIP ou status VIP do servidor |
 | `!help` | `!ajuda`, `!comandos`, `!h` | Exibe o painel de comandos |
@@ -49,6 +46,9 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
+| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada com menu interativo ou pula direto para o número escolhido (removendo as anteriores) |
+| `!pause` | `!pausar` | Pausa a reprodução atual |
+| `!resume` | `!despausar`, `!continuar`, `!unpause` | Retoma a música pausada |
 | `!skip` | `!s`, `!pular`, `!next` | Pula a faixa atual *(exclusivo para quem puxou o bot para a call)* |
 | `!volume <1-200>` | `!vol`, `!v` | Ajusta o volume HD do player entre `1%` e `200%` |
 | `!autoplay` | `!ap`, `!auto` | Ativa/desativa a reprodução contínua de músicas recomendadas |

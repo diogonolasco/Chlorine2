@@ -87,7 +87,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     }
     warnedNonVipUsers.add(userId);
     const defaultDescription =
-      'Os comandos **!skip**, **!volume** e **!autoplay** são exclusivos para servidores com plano **Chlorine VIP**!\n\n' +
+      'Os comandos **!skip**, **!pause**, **!resume**, **!queue**, **!volume** e **!autoplay** são exclusivos para servidores com plano **Chlorine VIP**!\n\n' +
       'Digite **!vip** ou use **/vip** para conhecer os planos e liberar para o seu servidor!';
     replyFn({ embeds: [createVipLockedEmbed(description || defaultDescription)] });
     return true;
@@ -155,6 +155,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
               '> 📻 **Autoplay Automático:** Músicas recomendadas sem parar!',
               '> 🔊 **Volume Avançado:** Ajuste o volume até 200% com áudio HD!',
               '> ⏭️ **Skip Liberado:** Pule faixas instantaneamente!',
+              '> 📜 **Fila Interativa (!queue):** Veja a fila e pule para qualquer faixa!',
+              '> ⏸️ **Pause & Resume:** Pause e retome músicas quando quiser!',
               '> ⚡ **Prioridade de Conexão:** Menor latência e sem quedas de buffer.',
               '> 👑 **Embed Dourado Exclusivo:** Destaque no player do servidor.'
             ].join('\n'),
@@ -186,6 +188,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
             '> 📻 **!autoplay / !ap** • Músicas automáticas infinitas recomendadas!',
             '> 🔊 **!volume / !vol** • Controle de volume amplificado HD de 1% a 200%!',
             '> ⏭️ **!skip / !s** • Pule músicas sem votação ou restrições!',
+            '> 📜 **!queue / !q [nº]** • Veja a fila e pule direto para qualquer música!',
+            '> ⏸️ **!pause & !resume** • Pause e retome músicas quando quiser!',
             '> ⚡ **Buffer Prioritário** • Áudio sem travamentos ou lentidão!',
             '> 👑 **Suporte VIP Exclusivo** • Atendimento prioritário no servidor oficial.'
           ].join('\n'),
@@ -249,12 +253,9 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
           inline: false
         },
         {
-          name: '🎵 Controles do Player (Chat / Botões)',
+          name: '🎵 Controles do Player (Livres)',
           value: [
-            '> ⏸️ **!pause** • Pausar música',
-            '> ⏯️ **!resume** • Continuar música',
             '> ⏹️ **!stop** • Parar e limpar fila',
-            '> 📜 **!queue [nº]** • Ver fila e pular para uma música',
             '> 🔍 **!nowplaying** • Música tocando agora'
           ].join('\n'),
           inline: true
@@ -263,9 +264,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
           name: '👑 Comandos Exclusivos VIP',
           value: [
             '> 👑 **/vip** / **!vip** • Painel VIP',
-            '> 📻 **!autoplay** • Músicas recomendadas infinitas',
+            '> 📜 **!queue [nº]** • Ver fila e pular para uma música',
+            '> ⏸️ **!pause** • Pausar música',
+            '> ⏯️ **!resume** • Continuar música',
+            '> ⏭️ **!skip** • Pular faixas sem restrição',
             '> 🔊 **!volume <1-200>** • Volume HD amplificado',
-            '> ⏭️ **!skip** • Pular faixas sem restrição'
+            '> 📻 **!autoplay** • Músicas recomendadas infinitas'
           ].join('\n'),
           inline: true
         }
@@ -383,7 +387,9 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
           value: [
             `> 📻 **${commandPrefixLabel}autoplay** • Músicas automáticas infinitas!`,
             `> 🔊 **${commandPrefixLabel}volume <1-200>** • Controle de volume amplificado HD!`,
-            `> ⏭️ **${commandPrefixLabel}skip** • Pule músicas sem restrição!`
+            `> ⏭️ **${commandPrefixLabel}skip** • Pule músicas sem restrição!`,
+            `> 📜 **${commandPrefixLabel}queue [nº]** • Veja a fila e pule para qualquer música!`,
+            `> ⏸️ **${commandPrefixLabel}pause & ${commandPrefixLabel}resume** • Pause e retome quando quiser!`
           ].join('\n'),
           inline: false
         }
@@ -542,7 +548,19 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     }
   }
 
-  function handlePauseAction({ queue, isSlash, replyFn }) {
+  function handlePauseAction({ guildId, userId, queue, isSlash, replyFn }) {
+    const allowed = handleVipFeatureGate({
+      guildId,
+      userId,
+      isSlash,
+      slashDescription:
+        '⏸️ O comando de **Pausar Músicas (/pause)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n' +
+        'Digite `/vip` ou `!vip` para conhecer os planos e liberar para o seu servidor!',
+      slashRepeatText: '🔒 Comando de pause exclusivo para servidores VIP.',
+      replyFn
+    });
+    if (!allowed) return;
+
     const ephemeralFlag = isSlash ? { ephemeral: true } : {};
     if (!queue) {
       return replyFn({
@@ -565,7 +583,19 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     });
   }
 
-  function handleResumeAction({ queue, isSlash, replyFn }) {
+  function handleResumeAction({ guildId, userId, queue, isSlash, replyFn }) {
+    const allowed = handleVipFeatureGate({
+      guildId,
+      userId,
+      isSlash,
+      slashDescription:
+        '▶️ O comando de **Retomar Músicas (/resume)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n' +
+        'Digite `/vip` ou `!vip` para conhecer os planos e liberar para o seu servidor!',
+      slashRepeatText: '🔒 Comando de resume exclusivo para servidores VIP.',
+      replyFn
+    });
+    if (!allowed) return;
+
     const ephemeralFlag = isSlash ? { ephemeral: true } : {};
     if (!queue) {
       return replyFn({
@@ -585,6 +615,51 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(resumedText)],
       ...ephemeralFlag
     });
+  }
+
+  async function handleQueueAction({ guildId, userId, queue, jumpArg = null, isSlash, replyFn }) {
+    const allowed = handleVipFeatureGate({
+      guildId,
+      userId,
+      isSlash,
+      slashDescription:
+        '📜 O comando de **Fila de Músicas (/queue)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n' +
+        'Digite `/vip` ou `!vip` para conhecer os planos e liberar para o seu servidor!',
+      slashRepeatText: '🔒 Comando de fila exclusivo para servidores VIP.',
+      replyFn
+    });
+    if (!allowed) return;
+
+    if (!queue) {
+      if (isSlash) {
+        return replyFn({ content: '❌ Nenhuma fila de músicas ativa no momento!', ephemeral: true });
+      }
+      return replyFn({
+        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!')]
+      });
+    }
+
+    if (jumpArg !== null) {
+      return handleNumericQueueJump(queue, guildId, userId, jumpArg, replyFn);
+    }
+
+    return replyFn(renderQueuePayload(guildId, queue));
+  }
+
+  async function handleInteractionVipGate(interaction, featureLabel) {
+    if (vipManager.isGuildVip(interaction.guildId)) {
+      return true;
+    }
+    if (warnedNonVipUsers.has(interaction.user.id)) {
+      await interaction.deferUpdate().catch(() => {});
+      return false;
+    }
+    warnedNonVipUsers.add(interaction.user.id);
+    await interaction.reply({
+      content: `🔒 O comando de **${featureLabel}** é exclusivo para servidores com plano **Chlorine VIP**! Digite \`!vip\` ou \`/vip\` no chat para conhecer os planos e liberar.`,
+      ephemeral: true
+    });
+    return false;
   }
 
   function handleAutoplayAction({ guildId, userId, queue, isSlash, replyFn }) {
@@ -720,6 +795,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     if (commandName === 'pause') {
       return handlePauseAction({
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
         queue: distube.getQueue(interaction.guildId),
         isSlash: true,
         replyFn: (payload) => interaction.reply(payload)
@@ -728,6 +805,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     if (commandName === 'resume') {
       return handleResumeAction({
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
         queue: distube.getQueue(interaction.guildId),
         isSlash: true,
         replyFn: (payload) => interaction.reply(payload)
@@ -745,11 +824,13 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     }
 
     if (commandName === 'queue') {
-      const queue = distube.getQueue(interaction.guildId);
-      if (!queue) {
-        return interaction.reply({ content: '❌ Nenhuma fila de músicas ativa no momento!', ephemeral: true });
-      }
-      return interaction.reply(renderQueuePayload(interaction.guildId, queue));
+      return handleQueueAction({
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        queue: distube.getQueue(interaction.guildId),
+        isSlash: true,
+        replyFn: (payload) => interaction.reply(payload)
+      });
     }
 
     if (commandName === 'nowplaying') {
@@ -813,6 +894,10 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     // Seleção de música na fila (!queue / /queue)
     if (interaction.isStringSelectMenu() && interaction.customId === 'queue_jump_select') {
+      if (!(await handleInteractionVipGate(interaction, 'Fila (!queue)'))) {
+        return;
+      }
+
       const queue = distube.getQueue(interaction.guildId);
       if (!queue) {
         return interaction.update({
@@ -884,8 +969,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       });
     }
 
-    // Pausar / Despausar
+    // Pausar / Despausar (exclusivo VIP + aviso único)
     if (rawAction === 'pause') {
+      if (!(await handleInteractionVipGate(interaction, 'Pausar / Retomar Músicas'))) {
+        return;
+      }
+
       const controllerId = activeHostId || buttonHostId;
       if (queue.paused) {
         queue.resume();
@@ -901,15 +990,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     // Pular (exclusivo VIP + aviso único)
     if (rawAction === 'skip') {
-      if (!vipManager.isGuildVip(interaction.guildId)) {
-        if (warnedNonVipUsers.has(interaction.user.id)) {
-          return interaction.deferUpdate().catch(() => {});
-        }
-        warnedNonVipUsers.add(interaction.user.id);
-        return interaction.reply({
-          content: '🔒 O comando de **Pular Músicas** é exclusivo para servidores com plano **Chlorine VIP**! Digite `!vip` ou `/vip` no chat para conhecer os planos e liberar.',
-          ephemeral: true
-        });
+      if (!(await handleInteractionVipGate(interaction, 'Pular Músicas'))) {
+        return;
       }
 
       await interaction.deferUpdate().catch(() => {});
@@ -956,6 +1038,9 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         refMsg.author?.id === client.user?.id &&
         refMsg.embeds?.[0]?.title?.startsWith('🎶 Fila de Reprodução')
       ) {
+        if (!handleVipFeatureGate({ guildId: message.guild.id, userId: message.author.id, isSlash: false, replyFn: (payload) => message.reply(payload) })) {
+          return;
+        }
         const queue = distube.getQueue(message.guild.id);
         if (!queue) {
           return message.reply({
@@ -1051,6 +1136,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     // COMANDO: !pause (ou !pausar)
     if (['pause', 'pausar'].includes(command)) {
       return handlePauseAction({
+        guildId: message.guild.id,
+        userId: message.author.id,
         queue: distube.getQueue(message),
         isSlash: false,
         replyFn: (payload) => message.reply(payload)
@@ -1060,6 +1147,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     // COMANDO: !resume (ou !despausar, !continuar, !unpause)
     if (['resume', 'despausar', 'continuar', 'unpause'].includes(command)) {
       return handleResumeAction({
+        guildId: message.guild.id,
+        userId: message.author.id,
         queue: distube.getQueue(message),
         isSlash: false,
         replyFn: (payload) => message.reply(payload)
@@ -1068,20 +1157,14 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     // COMANDO: !queue (ou !fila, !q) — aceita também !queue <número> para pular direto
     if (['queue', 'fila', 'q'].includes(command)) {
-      const queue = distube.getQueue(message);
-      if (!queue) {
-        return message.reply({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!')]
-        });
-      }
-
-      if (args.length > 0) {
-        return handleNumericQueueJump(queue, message.guild.id, message.author.id, args[0], (payload) =>
-          message.reply(payload)
-        );
-      }
-
-      return message.reply(renderQueuePayload(message.guild.id, queue));
+      return handleQueueAction({
+        guildId: message.guild.id,
+        userId: message.author.id,
+        queue: distube.getQueue(message),
+        jumpArg: args.length > 0 ? args[0] : null,
+        isSlash: false,
+        replyFn: (payload) => message.reply(payload)
+      });
     }
 
     // COMANDO: !nowplaying (ou !np, !tocando)
