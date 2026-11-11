@@ -31,7 +31,7 @@ const {
   GOLD_COLOR,
   slashCommands,
   createCommandsModule
-} = require('./comando');
+} = require('./comandos');
 
 // Inicializa o cliente do Discord com as permissões necessárias
 const client = new Client({
@@ -73,7 +73,7 @@ const voiceSession = createVoiceSessionManager({
   getBotUserId: () => client.user?.id || null
 });
 
-// Módulo central de comandos, embeds, bloqueios VIP e interações (comando.js)
+// Módulo central de comandos, embeds, bloqueios VIP e interações (comandos.js)
 const { createMusicRow, registerCommandListeners } = createCommandsModule({
   client,
   distube,
