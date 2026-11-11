@@ -39,7 +39,7 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 | `!pause` | `!pausar` | Pausa a reprodução atual |
 | `!resume` | `!despausar`, `!continuar`, `!unpause` | Retoma a música pausada |
 | `!stop` | `!parar`, `!leave`, `!sair` | Para a música, limpa a fila e desconecta da chamada |
-| `!queue` | `!q`, `!fila` | Lista as próximas músicas, volume e status do autoplay |
+| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada com menu interativo ou pula direto para o número escolhido (removendo as anteriores) |
 | `!nowplaying` | `!np`, `!tocando` | Exibe detalhes e controles da faixa atual |
 | `!vip` | `!premium` | Mostra os planos VIP ou status VIP do servidor |
 | `!help` | `!ajuda`, `!comandos`, `!h` | Exibe o painel de comandos |
@@ -88,6 +88,7 @@ discord-music-bot/
 ├── index.js                    # Núcleo do bot Discord, comandos, botões e eventos DisTube
 ├── src/
 │   ├── dashboardServer.js      # Servidor Express e API do painel web (localhost:3000)
+│   ├── queueHelper.js          # Menu interativo numerado da fila e salto direto (!queue)
 │   ├── vipManager.js           # Persistência e gestão de planos/chaves VIP
 │   └── voiceSessionManager.js  # Controle do responsável da call e permissão de skip/autoplay
 ├── public/                     # Interface web (HTML, CSS e JS) do painel localhost

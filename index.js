@@ -30,6 +30,7 @@ const ffmpegStatic = require('ffmpeg-static');
 const vipManager = require('./src/vipManager');
 const { createDashboardServer } = require('./src/dashboardServer');
 const { createVoiceSessionManager } = require('./src/voiceSessionManager');
+const { buildQueueMessagePayload, jumpToQueuePosition } = require('./src/queueHelper');
 
 // Prefixo padrão dos comandos
 const PREFIX = '!';
@@ -262,6 +263,50 @@ async function playInVoiceChannel(guild, member, voiceChannel, query, extraOptio
     () => distube.play(voiceChannel, query, { member, ...extraOptions }),
     (guildId) => Boolean(distube.getQueue(guildId) || distube.voices.get(guildId))
   );
+}
+
+function renderQueuePayload(guildId, queue, notice = null) {
+  return buildQueueMessagePayload(queue, {
+    isVip: vipManager.isGuildVip(guildId),
+    embedColor: EMBED_COLOR,
+    goldColor: GOLD_COLOR,
+    notice
+  });
+}
+
+async function executeQueueJump(queue, guildId, userId, rawPosition, songIdHint = null) {
+  return jumpToQueuePosition({
+    queue,
+    guildId,
+    userId,
+    rawPosition,
+    songIdHint,
+    getSkipDenialMessage: (gId, uId, q) => voiceSession.getSkipDenialMessage(gId, uId, q)
+  });
+}
+
+async function handleNumericQueueJump(queue, guildId, userId, numStr, replyFn) {
+  if (!/^\d+$/.test(numStr)) {
+    const embed = new EmbedBuilder()
+      .setColor(EMBED_COLOR)
+      .setDescription('❌ Informe um número válido da fila! Exemplo: `!queue 3`');
+    return replyFn({ embeds: [embed] });
+  }
+
+  const requestedNumber = parseInt(numStr, 10);
+  const jumpResult = await executeQueueJump(queue, guildId, userId, requestedNumber);
+  if (!jumpResult.ok) {
+    const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(jumpResult.message);
+    return replyFn({ embeds: [embed] });
+  }
+
+  const confirmEmbed = new EmbedBuilder()
+    .setColor(vipManager.isGuildVip(guildId) ? GOLD_COLOR : EMBED_COLOR)
+    .setDescription(
+      `⏭️ Pulando para **#${jumpResult.targetIndex} • ${jumpResult.targetSong.name}**!\n` +
+      `🗑️ **${jumpResult.skippedCount}** música(s) pulada(s) foram excluída(s) da fila.`
+    );
+  return replyFn({ embeds: [confirmEmbed] });
 }
 
 // Cores ANSI para o terminal
@@ -532,19 +577,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: '❌ Nenhuma fila de músicas ativa no momento!', ephemeral: true });
       }
 
-      const q = queue.songs
-        .slice(0, 10)
-        .map((song, i) => `${i === 0 ? '▶️ **Tocando agora:**' : `**${i}.**`} [${song.name}](${song.url}) - \`${song.formattedDuration}\``)
-        .join('\n');
-
-      const isVip = vipManager.isGuildVip(interaction.guildId);
-      const embed = new EmbedBuilder()
-        .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
-        .setTitle(`🎶 Fila de Reprodução (${queue.songs.length} música(s)) ${isVip ? '👑' : ''}`)
-        .setDescription(q)
-        .setFooter({ text: `Volume: ${queue.volume}% | Autoplay: ${queue.autoplay ? 'Ativado ✅' : 'Desativado ❌'}` });
-
-      return interaction.reply({ embeds: [embed] });
+      return interaction.reply(renderQueuePayload(interaction.guildId, queue));
     }
 
     // /nowplaying
@@ -716,7 +749,7 @@ client.on('interactionCreate', async (interaction) => {
               '> ⏸️ **!pause** • Pausar música',
               '> ⏯️ **!resume** • Continuar música',
               '> ⏹️ **!stop** • Parar e limpar fila',
-              '> 📜 **!queue** • Ver próximas da fila',
+              '> 📜 **!queue [nº]** • Ver fila e pular para uma música',
               '> 🔍 **!nowplaying** • Música tocando agora'
             ].join('\n'),
             inline: true
@@ -740,6 +773,43 @@ client.on('interactionCreate', async (interaction) => {
       return interaction.reply({ embeds: [embed], files });
     }
     return;
+  }
+
+  // ============================================
+  // SELEÇÃO DE MÚSICA NA FILA (!queue / /queue)
+  // ============================================
+  if (interaction.isStringSelectMenu() && interaction.customId === 'queue_jump_select') {
+    const queue = distube.getQueue(interaction.guildId);
+    if (!queue) {
+      return interaction.update({
+        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!')],
+        components: []
+      }).catch(() => {});
+    }
+
+    const selectedValue = interaction.values?.[0] || '';
+    const colonIdx = selectedValue.indexOf(':');
+    const rawIndexStr = colonIdx >= 0 ? selectedValue.slice(0, colonIdx) : selectedValue;
+    const songIdHint = colonIdx >= 0 ? selectedValue.slice(colonIdx + 1) : '';
+    const rawPosition = parseInt(rawIndexStr, 10);
+
+    const jumpResult = await executeQueueJump(
+      queue,
+      interaction.guildId,
+      interaction.user.id,
+      rawPosition,
+      songIdHint || null
+    );
+
+    if (!jumpResult.ok) {
+      if (jumpResult.stale) {
+        return interaction.update(renderQueuePayload(interaction.guildId, queue, jumpResult.message)).catch(() => {});
+      }
+      return interaction.reply({ content: jumpResult.message, ephemeral: true });
+    }
+
+    const notice = `⏭️ Pulando para **${jumpResult.targetSong.name}** — **${jumpResult.skippedCount}** faixa(s) anterior(es) removida(s) da fila!`;
+    return interaction.update(renderQueuePayload(interaction.guildId, queue, notice)).catch(() => {});
   }
 
   // ============================================
@@ -914,6 +984,26 @@ client.on('messageCreate', async (message) => {
     return message.reply({ embeds: [embed], components: [row], files });
   }
 
+  // Se o usuário responder (Reply) à mensagem da fila apenas com o número da música (ex: 3)
+  const trimmedContent = message.content.trim();
+  if (message.reference?.messageId && /^\d+$/.test(trimmedContent)) {
+    const refMsg = await message.fetchReference().catch(() => null);
+    if (
+      refMsg &&
+      refMsg.author?.id === client.user?.id &&
+      refMsg.embeds?.[0]?.title?.startsWith('🎶 Fila de Reprodução')
+    ) {
+      const queue = distube.getQueue(message.guild.id);
+      if (!queue) {
+        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!');
+        return message.reply({ embeds: [embed] });
+      }
+      return handleNumericQueueJump(queue, message.guild.id, message.author.id, trimmedContent, (payload) =>
+        message.reply(payload)
+      );
+    }
+  }
+
   // Ignora mensagens que não comecem com o prefixo
   if (!message.content.startsWith(PREFIX)) return;
 
@@ -1046,7 +1136,7 @@ client.on('messageCreate', async (message) => {
     return message.reply({ embeds: [embed] });
   }
 
-  // COMANDO: !queue (ou !fila, !q)
+  // COMANDO: !queue (ou !fila, !q) — aceita também !queue <número> para pular direto
   if (['queue', 'fila', 'q'].includes(command)) {
     const queue = distube.getQueue(message);
     if (!queue) {
@@ -1054,18 +1144,13 @@ client.on('messageCreate', async (message) => {
       return message.reply({ embeds: [embed] });
     }
 
-    const q = queue.songs
-      .slice(0, 10)
-      .map((song, i) => `${i === 0 ? '▶️ **Tocando agora:**' : `**${i}.**`} [${song.name}](${song.url}) - \`${song.formattedDuration}\``)
-      .join('\n');
+    if (args.length > 0) {
+      return handleNumericQueueJump(queue, message.guild.id, message.author.id, args[0], (payload) =>
+        message.reply(payload)
+      );
+    }
 
-    const embed = new EmbedBuilder()
-      .setColor(EMBED_COLOR)
-      .setTitle(`🎶 Fila de Reprodução (${queue.songs.length} música(s))`)
-      .setDescription(q)
-      .setFooter({ text: `Volume: ${queue.volume}% | Autoplay: ${queue.autoplay ? 'Ativado ✅' : 'Desativado ❌'}` });
-
-    return message.reply({ embeds: [embed] });
+    return message.reply(renderQueuePayload(message.guild.id, queue));
   }
 
   // COMANDO: !nowplaying (ou !np, !tocando)
@@ -1271,7 +1356,7 @@ client.on('messageCreate', async (message) => {
             '> ⏸️ **!pause** • Pausar música',
             '> ⏯️ **!resume** • Continuar música',
             '> ⏹️ **!stop** • Parar e limpar fila',
-            '> 📜 **!queue** • Ver próximas da fila',
+            '> 📜 **!queue [nº]** • Ver fila e pular para uma música',
             '> 🔍 **!nowplaying** • Música tocando agora'
           ].join('\n'),
           inline: true
