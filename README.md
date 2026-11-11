@@ -85,7 +85,8 @@ Ao iniciar o bot, o painel web abre localmente em:
 
 ```text
 discord-music-bot/
-├── index.js                    # Núcleo do bot Discord, comandos, botões e eventos DisTube
+├── index.js                    # Núcleo do bot Discord, painéis, DisTube e conexão de voz
+├── comando.js                  # Todos os comandos (! /), botões, trava VIP e menu da fila
 ├── src/
 │   ├── dashboardServer.js      # Servidor Express e API do painel web (localhost:3000)
 │   ├── queueHelper.js          # Menu interativo numerado da fila e salto direto (!queue)
