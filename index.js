@@ -29,6 +29,7 @@ const { YtDlpPlugin } = require('@distube/yt-dlp');
 const ffmpegStatic = require('ffmpeg-static');
 const vipManager = require('./src/vipManager');
 const { createDashboardServer } = require('./src/dashboardServer');
+const { createVoiceSessionManager } = require('./src/voiceSessionManager');
 
 // Prefixo padrão dos comandos
 const PREFIX = '!';
@@ -64,20 +65,21 @@ function notifyNonVipOnce(userId, replyFn) {
 }
 
 // Função geradora dos botões do player (Sem o botão embaralhar, conforme solicitado)
-function createMusicRow(requesterId, isPaused = false) {
+function createMusicRow(controllerId, isPaused = false) {
+  const hostTag = controllerId && controllerId !== client.user?.id ? controllerId : 'open';
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`music_pause:${requesterId}`)
+      .setCustomId(`music_pause:${hostTag}`)
       .setLabel(isPaused ? 'Despausar' : 'Pausar')
       .setEmoji(isPaused ? '▶️' : '⏸️')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setCustomId(`music_skip:${requesterId}`)
+      .setCustomId(`music_skip:${hostTag}`)
       .setLabel('Pular')
       .setEmoji('⏭️')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`music_stop:${requesterId}`)
+      .setCustomId(`music_stop:${hostTag}`)
       .setLabel('Parar')
       .setEmoji('⏹️')
       .setStyle(ButtonStyle.Danger)
@@ -246,6 +248,22 @@ const distube = new DisTube(client, {
   ]
 });
 
+// Gerenciador de quem puxou o bot para a chamada de voz (dono da sessão/skip)
+const voiceSession = createVoiceSessionManager({
+  getBotVoiceChannel: (guild) => guild?.members?.me?.voice?.channel || distube.voices.get(guild?.id)?.channel,
+  getActiveQueue: (guildId) => distube.getQueue(guildId),
+  getBotUserId: () => client.user?.id || null
+});
+
+async function playInVoiceChannel(guild, member, voiceChannel, query, extraOptions = {}) {
+  return voiceSession.playWithSummonerTracking(
+    guild,
+    member,
+    () => distube.play(voiceChannel, query, { member, ...extraOptions }),
+    (guildId) => Boolean(distube.getQueue(guildId) || distube.voices.get(guildId))
+  );
+}
+
 // Cores ANSI para o terminal
 const colors = {
   cyan: '\x1b[1;36m',
@@ -360,9 +378,8 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({ content: `🔍 Buscando **"${query}"**...`, ephemeral: true });
 
       try {
-        await distube.play(voiceChannel, query, {
-          textChannel: interaction.channel,
-          member: interaction.member
+        await playInVoiceChannel(interaction.guild, interaction.member, voiceChannel, query, {
+          textChannel: interaction.channel
         });
         setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
       } catch (err) {
@@ -397,8 +414,9 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      if (queue.songs[0]?.user?.id && queue.songs[0].user.id !== interaction.user.id) {
-        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`❌ Apenas quem pediu esta música (<@${queue.songs[0].user.id}>) pode pulá-la!`);
+      const skipDenial = voiceSession.getSkipDenialMessage(interaction.guildId, interaction.user.id, queue);
+      if (skipDenial) {
+        const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(skipDenial);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -406,6 +424,7 @@ client.on('interactionCreate', async (interaction) => {
         if (queue.songs.length <= 1 && !queue.autoplay) {
           await queue.stop();
           distube.voices.leave(interaction.guildId);
+          voiceSession.clearVoiceSummoner(interaction.guildId);
           const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ Fim da fila. A reprodução foi encerrada.');
           return interaction.reply({ embeds: [embed], ephemeral: true });
         }
@@ -427,6 +446,7 @@ client.on('interactionCreate', async (interaction) => {
         await queue.stop().catch(() => {});
       }
       distube.voices.leave(interaction.guildId);
+      voiceSession.clearVoiceSummoner(interaction.guildId);
       const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ **Música parada e saí da chamada de voz com sucesso!** 👋');
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
@@ -536,16 +556,18 @@ client.on('interactionCreate', async (interaction) => {
 
       const isVip = vipManager.isGuildVip(interaction.guildId);
       const song = queue.songs[0];
+      const requesterInfo = voiceSession.formatSongRequesterInfo(queue, song);
+      const controllerId = voiceSession.resolveCallHostId(interaction.guildId, song.user?.id);
       const embed = new EmbedBuilder()
         .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
         .setTitle(isVip ? '👑 Tocando Agora • VIP' : '🎵 Tocando Agora')
-        .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • **Pedido por:** ${song.user}`);
+        .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • ${requesterInfo}`);
 
       if (song.thumbnail) {
         embed.setThumbnail(song.thumbnail);
       }
 
-      const row = createMusicRow(song.user.id, queue.paused);
+      const row = createMusicRow(controllerId, queue.paused);
       return interaction.reply({ embeds: [embed], components: [row] });
     }
 
@@ -735,15 +757,7 @@ client.on('interactionCreate', async (interaction) => {
 
   if (!interaction.customId.startsWith('music_')) return;
 
-  const [rawAction, requesterId] = interaction.customId.replace('music_', '').split(':');
-
-  // Trava de segurança: apenas quem pediu a música pode usar os botões
-  if (interaction.user.id !== requesterId) {
-    return interaction.reply({
-      content: `❌ Apenas quem pediu esta música (<@${requesterId}>) pode usar estes botões!`,
-      ephemeral: true
-    });
-  }
+  const [rawAction, buttonHostId] = interaction.customId.replace('music_', '').split(':');
 
   const queue = distube.getQueue(interaction.guildId);
   if (!queue) {
@@ -753,15 +767,32 @@ client.on('interactionCreate', async (interaction) => {
     });
   }
 
+  const activeHostId = voiceSession.resolveCallHostId(
+    interaction.guildId,
+    buttonHostId && buttonHostId !== 'open' ? buttonHostId : queue.songs[0]?.user?.id
+  );
+
+  // Trava de segurança: apenas quem puxou o bot para a call pode usar os botões (mesmo no Autoplay)
+  if (activeHostId && interaction.user.id !== activeHostId) {
+    return interaction.reply({
+      content:
+        rawAction === 'skip'
+          ? `❌ Apenas quem puxou o bot para a call (<@${activeHostId}>) pode pular músicas!`
+          : `❌ Apenas quem puxou o bot para a call (<@${activeHostId}>) pode usar estes botões!`,
+      ephemeral: true
+    });
+  }
+
   // Ação: Pausar / Despausar
   if (rawAction === 'pause') {
+    const controllerId = activeHostId || buttonHostId;
     if (queue.paused) {
       queue.resume();
-      const row = createMusicRow(requesterId, false);
+      const row = createMusicRow(controllerId, false);
       await interaction.update({ components: [row] }).catch(() => {});
     } else {
       queue.pause();
-      const row = createMusicRow(requesterId, true);
+      const row = createMusicRow(controllerId, true);
       await interaction.update({ components: [row] }).catch(() => {});
     }
     return;
@@ -801,6 +832,7 @@ client.on('interactionCreate', async (interaction) => {
     await interaction.deferUpdate().catch(() => {});
     await queue.stop().catch(() => {});
     distube.voices.leave(interaction.guildId);
+    voiceSession.clearVoiceSummoner(interaction.guildId);
     return;
   }
 });
@@ -906,9 +938,8 @@ client.on('messageCreate', async (message) => {
     const searchMsg = await message.channel.send({ embeds: [searchEmbed] });
 
     try {
-      await distube.play(voiceChannel, query, {
+      await playInVoiceChannel(message.guild, message.member, voiceChannel, query, {
         textChannel: message.channel,
-        member: message.member,
         message
       });
       // Deleta a mensagem temporária de busca
@@ -934,9 +965,10 @@ client.on('messageCreate', async (message) => {
       return message.reply({ embeds: [embed] });
     }
 
-    // Trava: apenas quem pediu a música atual pode pulá-la
-    if (queue.songs[0]?.user?.id && queue.songs[0].user.id !== message.author.id) {
-      const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`❌ Apenas quem pediu esta música (<@${queue.songs[0].user.id}>) pode pulá-la!`);
+    // Trava: apenas quem puxou o bot para a call tem poder de usar skip (mesmo no autoplay)
+    const skipDenial = voiceSession.getSkipDenialMessage(message.guild.id, message.author.id, queue);
+    if (skipDenial) {
+      const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(skipDenial);
       return message.reply({ embeds: [embed] });
     }
 
@@ -944,6 +976,7 @@ client.on('messageCreate', async (message) => {
       if (queue.songs.length <= 1 && !queue.autoplay) {
         await queue.stop();
         distube.voices.leave(message);
+        voiceSession.clearVoiceSummoner(message.guild.id);
         const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ Fim da fila. A reprodução foi encerrada.');
         return message.reply({ embeds: [embed] });
       }
@@ -972,6 +1005,7 @@ client.on('messageCreate', async (message) => {
       await queue.stop().catch(() => {});
     }
     distube.voices.leave(message);
+    voiceSession.clearVoiceSummoner(message.guild.id);
     const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ **Música parada e saí da chamada com sucesso!** 👋');
     return message.reply({ embeds: [embed] });
   }
@@ -1043,16 +1077,18 @@ client.on('messageCreate', async (message) => {
     }
 
     const song = queue.songs[0];
+    const requesterInfo = voiceSession.formatSongRequesterInfo(queue, song);
+    const controllerId = voiceSession.resolveCallHostId(message.guild.id, song.user?.id);
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)
       .setTitle('🎵 Tocando Agora')
-      .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • **Pedido por:** ${song.user}`);
+      .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • ${requesterInfo}`);
 
     if (song.thumbnail) {
       embed.setThumbnail(song.thumbnail);
     }
 
-    const row = createMusicRow(song.user.id, queue.paused);
+    const row = createMusicRow(controllerId, queue.paused);
     return message.reply({ embeds: [embed], components: [row] });
   }
 
@@ -1271,20 +1307,27 @@ distube.on('playSong', (queue, song) => {
 
   const isVip = vipManager.isGuildVip(queue.id);
   const time = new Date().toLocaleTimeString('pt-BR');
-  console.log(`${colors.gray}[${time}]${colors.reset} ${colors.green}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.cyan}[Pedido por: ${song.user?.tag || song.user?.username || 'Membro'}]${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
+  const isBotQueued = song.user?.id === client.user?.id;
+  const requesterLabel = isBotQueued
+    ? (queue.autoplay ? 'Autoplay Automático' : 'Painel Web')
+    : (song.user?.tag || song.user?.username || 'Membro');
+
+  console.log(`${colors.gray}[${time}]${colors.reset} ${colors.green}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.cyan}[Pedido por: ${requesterLabel}]${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
 
   const title = isSkipped ? '⏭️ Faixa Pulada & Tocando Agora' : (isVip ? '👑 Tocando Agora • Servidor VIP' : '🎵 Tocando Agora');
+  const requesterInfo = voiceSession.formatSongRequesterInfo(queue, song);
+  const controllerId = voiceSession.resolveCallHostId(queue.id, song.user?.id);
 
   const embed = new EmbedBuilder()
     .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
     .setTitle(title)
-    .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** ${song.formattedDuration} • **Pedido por:** ${song.user}`);
+    .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** ${song.formattedDuration} • ${requesterInfo}`);
 
   if (song.thumbnail) {
     embed.setThumbnail(song.thumbnail);
   }
 
-  const row = createMusicRow(song.user.id, false);
+  const row = createMusicRow(controllerId, false);
   queue.textChannel?.send({ embeds: [embed], components: [row] }).catch(() => {});
 });
 
@@ -1347,12 +1390,18 @@ distube.on('finish', (queue) => {
 
 // Quando o canal de voz fica vazio
 distube.on('empty', (queue) => {
+  voiceSession.clearVoiceSummoner(queue.id);
   const time = new Date().toLocaleTimeString('pt-BR');
   console.log(`${colors.gray}[${time}]${colors.reset} ${colors.yellow}👋 DESCONECTADO:${colors.reset} Canal de voz vazio.`);
   const embed = new EmbedBuilder()
     .setColor(EMBED_COLOR)
     .setDescription('👋 **O canal de voz ficou vazio, saindo...**');
   queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+});
+
+// Quando o bot se desconecta da chamada de voz
+distube.on('disconnect', (queue) => {
+  voiceSession.clearVoiceSummoner(queue.id);
 });
 
 // Depuração do FFmpeg (para monitorar alertas ou interrupções de stream)
@@ -1362,9 +1411,13 @@ distube.on('ffmpegDebug', (msg) => {
   }
 });
 
-// Estabilizador de conexão de voz para evitar quedas prematuras de áudio
+// Estabilizador de conexão de voz + limpeza de responsável quando o bot sair da call
 client.on('voiceStateUpdate', (oldState, newState) => {
-  if (newState.id === client.user.id && newState.channelId) {
+  if (newState.id === client.user.id) {
+    if (!newState.channelId) {
+      voiceSession.clearVoiceSummoner(newState.guild.id);
+      return;
+    }
     const queue = distube.getQueue(newState.guild.id);
     if (queue?.voice?.connection && typeof queue.voice.connection.configureNetworking === 'function') {
       try {
