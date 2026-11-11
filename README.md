@@ -7,17 +7,17 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 ## ✨ Funcionalidades Atuais
 
 - 🔍 **Reprodução Multi-Plataforma:** Busca inteligente por nome e suporte a links/playlists via `@distube/youtube`, `@distube/spotify`, `@distube/yt-dlp` (e suporte opcional a `cookies.txt` para o YouTube).
-- 🔊 **Áudio HD Estável:** Utiliza `@discordjs/opus` nativo (evitando engasgos e quedas prematuras em mixes longos), `ffmpeg-static` integrado e estabilizador de conexão de voz no Discord.
-- 👑 **Controle Exclusivo de Call (Skip & Autoplay):**
+- 🔊 **Áudio HD Estável & Call Visível:** Utiliza `@discordjs/opus` nativo (evitando engasgos e quedas prematuras em mixes longos), `ffmpeg-static` integrado, estabilizador de voz e exibição do canal de voz ativo (`🔊 Call`) no embed de *Tocando Agora*.
+- 👑 **Controle Exclusivo de Call (Skip, Fila & Autoplay):**
   - Quem puxar o bot para o canal de voz primeiro (`/play` ou `!play`) torna-se o responsável pela chamada.
-  - Mesmo que outros membros adicionem músicas à fila ou que o **Autoplay** esteja ativo tocando músicas recomendadas, **apenas quem puxou o bot para a call** pode pular faixas (`!skip` / botão `⏭️ Pular`) e controlar os botões do player.
-- 🎮 **Player Interativo sem Poluição:** Card de *Tocando Agora* com capa, duração e botões (`⏸️ Pausar / ▶️ Despausar`, `⏭️ Pular`, `⏹️ Parar`).
-- 🚀 **Slash Commands Enxutos (`/`):** Apenas os 3 comandos principais registrados globalmente (`/play`, `/vip`, `/help`) para manter o perfil do bot limpo, junto do prefixo `!` completo no chat.
+  - Mesmo que outros membros adicionem faixas ou que o **Autoplay** esteja ativo tocando músicas recomendadas, **apenas quem puxou o bot para a call** pode pular faixas (`!skip`, botão `⏭️ Pular` ou salto numerado no `!queue`).
+- 🎮 **Player Interativo sem Poluição:** Card de *Tocando Agora* com capa, duração, call conectada e botões (`⏸️ Pausar / ▶️ Despausar`, `⏭️ Pular`, `⏹️ Parar`).
+- 🚀 **Slash Commands Enxutos (`/`) & Código Modular:** Apenas os 3 comandos principais registrados globalmente (`/play`, `/vip`, `/help`) para manter o perfil do bot limpo, com todos os comandos de chat (`!`), travas e botões centralizados em [`comandos.js`](comandos.js).
 - 💬 **Status Personalizado & Menção:** Status `!play ou /play | Música` e resposta automática com card e botão de convite ao mencionar `@Chlorine Music™`.
 - 💎 **Sistema Chlorine VIP:**
-  - Planos disponíveis diretamente em `/vip` ou `!vip`, com botão para o servidor oficial e embeds dourados para servidores VIP.
-  - Aviso único para usuários sem VIP que tentam comandos bloqueados (evita spam no chat).
-- 🌐 **Painel Web Localhost (`http://localhost:3000`):** Controle completo de músicas por servidor, fila ao vivo, geração/gerenciamento de chaves VIP e ativação direta com 1 clique.
+  - Comandos `!queue`, `!pause`, `!resume`, `!skip`, `!volume` e `!autoplay` — além dos botões `⏸️ Pausar / ▶️ Despausar` e `⏭️ Pular`, menu interativo da fila e resposta numérica — exclusivos para servidores VIP.
+  - Planos disponíveis em `/vip` ou `!vip`, embeds dourados em servidores VIP e aviso único por usuário sem VIP quando tenta usar um recurso bloqueado (evitando spam no chat).
+- 🌐 **Painel Web Localhost do Dono (`http://localhost:3000`):** Interface responsiva com call conectada ao vivo, troca de canal de voz, controle completo do player e edição total da fila em tempo real, além de gestão de chaves e servidores VIP.
 
 ---
 
@@ -46,12 +46,14 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
-| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada com menu interativo ou pula direto para o número escolhido (removendo as anteriores) |
+| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada e permite pular direto para a faixa escolhida (por `!queue <nº>`, menu suspenso ou respondendo com o número no chat), removendo as faixas puladas |
 | `!pause` | `!pausar` | Pausa a reprodução atual |
 | `!resume` | `!despausar`, `!continuar`, `!unpause` | Retoma a música pausada |
 | `!skip` | `!s`, `!pular`, `!next` | Pula a faixa atual *(exclusivo para quem puxou o bot para a call)* |
 | `!volume <1-200>` | `!vol`, `!v` | Ajusta o volume HD do player entre `1%` e `200%` |
 | `!autoplay` | `!ap`, `!auto` | Ativa/desativa a reprodução contínua de músicas recomendadas |
+
+> 🔒 **Regras de Bloqueio:** Os botões **`⏸️ Pausar / ▶️ Despausar`** e **`⏭️ Pular`** do player seguem as travas VIP (e de responsável pela call no caso de pular/saltar faixas). Usuários em servidores sem VIP recebem apenas **1 aviso** para evitar poluição no chat.
 
 ---
 
@@ -71,13 +73,18 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 
 ## 🌐 Painel de Controle Web (Localhost)
 
-Ao iniciar o bot, o painel web abre localmente em:
+Ao iniciar o bot, o painel web do dono abre localmente com layout responsivo em:
 
 👉 **`http://localhost:3000`**
 
-* **🎛️ Player & Músicas (Owner):** Veja em qual call o bot está tocando (`🔊 Call`), troque de canal de voz ao vivo, avance na barra de progresso, controle `Play` *(na fila, próxima ou imediata)*, `Previous`, `Pause`, `Skip`, `Stop`, `Repeat`, `Autoplay`, `Shuffle`, volume (1–200%) e edite toda a fila ao vivo (arrastar/reordenar, pular direto, limpar ou remover faixas).
+* **🎛️ Player & Voz ao Vivo (Owner):**
+  * Exibe em tempo real a call conectada (`🔊 Call: <nome>`) no cabeçalho do servidor e no card *Tocando Agora*.
+  * Permite trocar o bot de canal de voz ao vivo (`Mover Bot p/ Call`).
+  * Barra de progresso clicável (seek), controles `Previous`, `Pause / Resume`, `Skip`, `Stop`, `Repeat` (desativado/faixa/fila), `Autoplay`, `Shuffle` e volume (`1%` a `200%`).
+  * Tocar músicas pelo painel escolhendo entre **`Adicionar à fila`**, **`Próxima (#1)`** ou **`Tocar imediatamente`**.
+* **📜 Gestão Completa da Fila:** Reordene faixas arrastando e soltando ou pelos botões subir/descer, coloque como próxima (`#1`), pule direto para qualquer posição, remova itens individuais ou limpe a fila inteira.
 * **👑 Sistema VIP:** Gere chaves aleatórias por plano (7, 15, 30, 90 ou 365 dias), visualize chaves ativas/resgatadas e ative ou remova VIP de servidores diretamente.
-* **🌍 Servidores:** Monitore servidores conectados, fila ativa e ping do bot em tempo real.
+* **🌍 Servidores:** Monitore servidores conectados, fila ativa, call atual e ping do bot em tempo real.
 
 ---
 
