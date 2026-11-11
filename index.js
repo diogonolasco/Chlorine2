@@ -174,17 +174,21 @@ distube.on('playSong', (queue, song) => {
   const requesterLabel = isBotQueued
     ? (queue.autoplay ? 'Autoplay Automático' : 'Painel Web')
     : (song.user?.tag || song.user?.username || 'Membro');
+  const voiceChannelName =
+    queue.voiceChannel?.name || distube.voices.get(queue.id)?.channel?.name || null;
+  const callTag = voiceChannelName ? ` [🔊 ${voiceChannelName}]` : '';
 
-  console.log(`${colors.gray}[${time}]${colors.reset} ${colors.green}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.cyan}[Pedido por: ${requesterLabel}]${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
+  console.log(`${colors.gray}[${time}]${colors.reset} ${colors.green}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.cyan}[Pedido por: ${requesterLabel}]${colors.reset}${colors.gray}${callTag}${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
 
   const title = isSkipped ? '⏭️ Faixa Pulada & Tocando Agora' : (isVip ? '👑 Tocando Agora • Servidor VIP' : '🎵 Tocando Agora');
   const requesterInfo = voiceSession.formatSongRequesterInfo(queue, song);
+  const callInfo = voiceChannelName ? `\n🔊 **Call:** ${voiceChannelName}` : '';
   const controllerId = voiceSession.resolveCallHostId(queue.id, song.user?.id);
 
   const embed = new EmbedBuilder()
     .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
     .setTitle(title)
-    .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** ${song.formattedDuration} • ${requesterInfo}`);
+    .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** ${song.formattedDuration} • ${requesterInfo}${callInfo}`);
 
   if (song.thumbnail) {
     embed.setThumbnail(song.thumbnail);

@@ -75,7 +75,7 @@ Ao iniciar o bot, o painel web abre localmente em:
 
 👉 **`http://localhost:3000`**
 
-* **🎛️ Player & Músicas:** Escolha o servidor e controle `Play`, `Pause`, `Skip`, `Stop`, `Autoplay`, seleção de canal de voz, volume e fila ao vivo.
+* **🎛️ Player & Músicas (Owner):** Veja em qual call o bot está tocando (`🔊 Call`), troque de canal de voz ao vivo, avance na barra de progresso, controle `Play` *(na fila, próxima ou imediata)*, `Previous`, `Pause`, `Skip`, `Stop`, `Repeat`, `Autoplay`, `Shuffle`, volume (1–200%) e edite toda a fila ao vivo (arrastar/reordenar, pular direto, limpar ou remover faixas).
 * **👑 Sistema VIP:** Gere chaves aleatórias por plano (7, 15, 30, 90 ou 365 dias), visualize chaves ativas/resgatadas e ative ou remova VIP de servidores diretamente.
 * **🌍 Servidores:** Monitore servidores conectados, fila ativa e ping do bot em tempo real.
 

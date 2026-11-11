@@ -6,6 +6,17 @@ let currentGuildId = null;
 let selectedPlanId = '30d';
 let plansData = {};
 let pollTimer = null;
+let currentSongDurationSec = 0;
+let dragSourceIndex = null;
+
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Inicialização ao carregar a página
 document.addEventListener('DOMContentLoaded', () => {
@@ -85,9 +96,10 @@ async function loadStatus() {
       return;
     }
 
-    data.guilds.forEach((g, idx) => {
+    data.guilds.forEach((g) => {
       const vipIcon = g.isVip ? '👑 ' : '';
-      const activeQueueIcon = g.hasActiveQueue ? ' 🎵' : '';
+      const callSuffix = g.voiceChannelName ? ` • 🔊 ${g.voiceChannelName}` : '';
+      const activeQueueIcon = g.hasActiveQueue ? ` 🎵${callSuffix}` : '';
       const opt = document.createElement('option');
       opt.value = g.id;
       opt.textContent = `${vipIcon}${g.name} (${g.memberCount} membros)${activeQueueIcon}`;
@@ -98,9 +110,10 @@ async function loadStatus() {
       directGuildSelect.appendChild(directOpt);
     });
 
-    // Seleciona o primeiro servidor por padrão se nenhum estiver selecionado
+    // Seleciona primeiro servidor com música tocando ou o primeiro da lista
     if (!currentGuildId && data.guilds.length > 0) {
-      currentGuildId = data.guilds[0].id;
+      const preferredGuild = data.guilds.find((g) => g.hasActiveQueue) || data.guilds[0];
+      currentGuildId = preferredGuild.id;
       serverSelect.value = currentGuildId;
       loadGuildQueue(currentGuildId);
     }
@@ -125,13 +138,16 @@ function renderGuildsGrid(guilds) {
     const vipBadge = g.isVip
       ? '<span class="badge badge-gold">👑 VIP Ativo</span>'
       : '<span class="badge badge-normal">Normal</span>';
+    const callBadge = g.voiceChannelName
+      ? `<span class="badge badge-cyan" style="margin-left: 6px;">🔊 ${escapeHtml(g.voiceChannelName)}</span>`
+      : '';
 
     card.innerHTML = `
-      <img src="${iconUrl}" alt="${g.name}" class="guild-icon">
+      <img src="${iconUrl}" alt="${escapeHtml(g.name)}" class="guild-icon">
       <div class="guild-info">
-        <h4>${g.name}</h4>
+        <h4>${escapeHtml(g.name)}</h4>
         <p class="guild-members">👥 ${g.memberCount} membros</p>
-        <div style="margin-top: 6px;">${vipBadge}</div>
+        <div style="margin-top: 6px;">${vipBadge}${callBadge}</div>
       </div>
     `;
 
@@ -160,21 +176,45 @@ async function loadGuildQueue(guildId, isPolling = false) {
     // Atualiza badge VIP do servidor
     const vipBadgeContainer = document.getElementById('server-vip-badge');
     if (data.guild.isVip) {
-      vipBadgeContainer.innerHTML = `<span class="badge badge-gold">👑 SERVIDOR VIP • ${data.guild.vipInfo?.formattedRemaining || 'Ativo'}</span>`;
+      vipBadgeContainer.innerHTML = `<span class="badge badge-gold">👑 SERVIDOR VIP • ${escapeHtml(data.guild.vipInfo?.formattedRemaining || 'Ativo')}</span>`;
     } else {
       vipBadgeContainer.innerHTML = `<span class="badge badge-normal">Servidor Normal</span>`;
     }
 
-    // Popula canais de voz no Quick Play
-    if (!isPolling) {
-      const voiceSelect = document.getElementById('quick-play-voice');
+    const activeVoice = data.queue?.voiceChannel || data.activeVoiceChannel || null;
+
+    // Popula canais de voz (sem perder a seleção atual durante polling)
+    const voiceSelect = document.getElementById('quick-play-voice');
+    const isSelectFocused = document.activeElement === voiceSelect;
+    if (!isPolling || !isSelectFocused) {
+      const previousVal = !isPolling ? '' : voiceSelect.value;
       voiceSelect.innerHTML = '<option value="">Canal de voz automático</option>';
       data.voiceChannels.forEach((vc) => {
         const opt = document.createElement('option');
         opt.value = vc.id;
-        opt.textContent = `🔊 ${vc.name} (${vc.membersCount} online)`;
+        const isBotHere = activeVoice && activeVoice.id === vc.id;
+        opt.textContent = `${isBotHere ? '🎙️ [BOT AQUI] ' : '🔊 '}${vc.name} (${vc.membersCount} online)`;
         voiceSelect.appendChild(opt);
       });
+      if (previousVal && data.voiceChannels.some((vc) => vc.id === previousVal)) {
+        voiceSelect.value = previousVal;
+      }
+    }
+
+    // Atualiza indicador da call ativa em cima e dentro do card
+    const serverVoicePill = document.getElementById('server-voice-pill');
+    const playerVoiceBadge = document.getElementById('player-voice-badge');
+    const quickCallHint = document.getElementById('quick-play-call-hint');
+    if (activeVoice?.name) {
+      serverVoicePill.textContent = `🔊 Call: ${activeVoice.name}`;
+      serverVoicePill.style.display = 'inline-block';
+      playerVoiceBadge.textContent = `🔊 Call: ${activeVoice.name}`;
+      playerVoiceBadge.style.display = 'inline-block';
+      quickCallHint.textContent = `🔊 Tocando na call: ${activeVoice.name}`;
+    } else {
+      serverVoicePill.style.display = 'none';
+      playerVoiceBadge.style.display = 'none';
+      quickCallHint.textContent = 'Bot fora de chamada de voz no momento';
     }
 
     const q = data.queue;
@@ -188,19 +228,26 @@ async function loadGuildQueue(guildId, isPolling = false) {
     const soundwave = document.getElementById('soundwave');
     const pauseIcon = document.getElementById('pause-icon');
     const autoplayBtn = document.getElementById('btn-autoplay');
+    const repeatBtn = document.getElementById('btn-repeat');
+    const repeatText = document.getElementById('repeat-text');
+    const prevBtn = document.getElementById('btn-previous');
     const volumeSlider = document.getElementById('volume-slider');
     const volumeVal = document.getElementById('volume-val');
 
     if (q && q.currentSong) {
       const song = q.currentSong;
+      const callSuffix = activeVoice?.name ? ` • 🔊 Call: ${activeVoice.name}` : '';
       titleEl.textContent = song.name;
-      metaEl.textContent = `Pedido por: ${song.user} • Duração: ${song.formattedDuration}`;
+      titleEl.title = song.name;
+      metaEl.textContent = `Pedido por: ${song.user} • Duração: ${song.formattedDuration}${callSuffix}`;
       thumbEl.src = song.thumbnail || '/assets/chlorine_gold.webp';
 
       curTimeEl.textContent = q.formattedCurrentTime || '00:00';
       totTimeEl.textContent = song.formattedDuration || '00:00';
 
-      const progressPercent = q.currentTime > 0 ? Math.min(100, (q.currentTime / parseDurationSec(song.formattedDuration)) * 100) : 0;
+      const totalSec = song.duration > 0 ? song.duration : parseDurationSec(song.formattedDuration);
+      currentSongDurationSec = totalSec;
+      const progressPercent = q.currentTime > 0 ? Math.min(100, (q.currentTime / Math.max(1, totalSec)) * 100) : 0;
       fillEl.style.width = `${progressPercent}%`;
 
       if (q.paused) {
@@ -223,14 +270,32 @@ async function loadGuildQueue(guildId, isPolling = false) {
         document.getElementById('autoplay-text').textContent = 'Autoplay: OFF';
       }
 
+      const repeatMode = q.repeatMode || 0;
+      if (repeatMode === 1) {
+        repeatBtn.classList.add('active');
+        repeatText.textContent = 'Repetir: Música';
+      } else if (repeatMode === 2) {
+        repeatBtn.classList.add('active');
+        repeatText.textContent = 'Repetir: Fila';
+      } else {
+        repeatBtn.classList.remove('active');
+        repeatText.textContent = 'Repetir: OFF';
+      }
+
+      prevBtn.disabled = !q.canPrevious;
       volumeSlider.value = q.volume;
       volumeVal.textContent = `${q.volume}%`;
 
-      // Atualiza lista da fila
-      renderQueueList(q.songs);
+      if (dragSourceIndex === null) {
+        renderQueueList(q.songs, activeVoice?.name || null);
+      }
     } else {
+      currentSongDurationSec = 0;
       titleEl.textContent = 'Nenhuma música tocando no momento';
-      metaEl.textContent = 'Use o formulário abaixo para tocar qualquer música no canal!';
+      titleEl.title = '';
+      metaEl.textContent = activeVoice?.name
+        ? `Bot conectado em 🔊 ${activeVoice.name} • Dê play abaixo!`
+        : 'Use o formulário abaixo para tocar qualquer música no canal!';
       thumbEl.src = '/assets/chlorine_gold.webp';
       fillEl.style.width = '0%';
       curTimeEl.textContent = '00:00';
@@ -239,8 +304,11 @@ async function loadGuildQueue(guildId, isPolling = false) {
       statusBadge.className = 'queue-status-badge badge badge-normal';
       soundwave.style.display = 'none';
       pauseIcon.textContent = '⏸️';
+      repeatBtn.classList.remove('active');
+      repeatText.textContent = 'Repetir: OFF';
+      prevBtn.disabled = true;
 
-      renderQueueList([]);
+      renderQueueList([], activeVoice?.name || null);
     }
   } catch (err) {
     console.error('Erro ao carregar fila:', err);
@@ -255,10 +323,11 @@ function parseDurationSec(str) {
   return 1;
 }
 
-// Renderiza a lista de músicas da fila
-function renderQueueList(songs) {
+// Renderiza a lista de músicas da fila com controles completos do Owner (pular, reordenar, arrastar, remover)
+function renderQueueList(songs, activeVoiceName = null) {
   const container = document.getElementById('queue-list');
   const countEl = document.getElementById('queue-count');
+  const previousScrollTop = container.scrollTop;
   countEl.textContent = songs.length;
 
   if (songs.length === 0) {
@@ -272,27 +341,111 @@ function renderQueueList(songs) {
   }
 
   container.innerHTML = '';
+  const maxUpcomingIdx = songs.length - 1;
+
   songs.forEach((s, idx) => {
     const item = document.createElement('div');
-    item.className = 'queue-item';
     const isPlaying = idx === 0;
+    item.className = `queue-item ${isPlaying ? 'playing' : ''}`;
+
+    const safeName = escapeHtml(s.name);
+    const safeUser = escapeHtml(s.user);
+    const callInfoText = isPlaying && activeVoiceName ? ` • 🔊 ${escapeHtml(activeVoiceName)}` : '';
+    const subText = isPlaying ? `Tocando agora${callInfoText}` : `Pedido por: ${safeUser}`;
+
+    const actionsHtml = isPlaying
+      ? ''
+      : `
+        <div class="queue-actions">
+          <button type="button" class="q-act-btn q-play" title="Pular para esta música agora (remove as anteriores)" onclick="jumpQueueItem(${idx})">▶</button>
+          <button type="button" class="q-act-btn" title="Tocar em seguida (#1)" onclick="moveQueueItem(${idx}, 1)" ${idx === 1 ? 'disabled' : ''}>⏫</button>
+          <button type="button" class="q-act-btn" title="Subir na fila" onclick="moveQueueItem(${idx}, ${idx - 1})" ${idx === 1 ? 'disabled' : ''}>⬆️</button>
+          <button type="button" class="q-act-btn" title="Descer na fila" onclick="moveQueueItem(${idx}, ${idx + 1})" ${idx === maxUpcomingIdx ? 'disabled' : ''}>⬇️</button>
+          <button type="button" class="q-act-btn q-del" title="Remover da fila" onclick="removeQueueItem(${idx})">✕</button>
+        </div>
+      `;
 
     item.innerHTML = `
+      ${isPlaying ? '' : '<span class="queue-drag-handle" title="Arraste para reordenar">⋮⋮</span>'}
       <span class="queue-index">${isPlaying ? '▶' : idx}</span>
       <img src="${s.thumbnail || '/assets/chlorine_gold.webp'}" alt="Thumb" class="queue-thumb">
       <div class="queue-info">
-        <div class="queue-name">${s.name}</div>
-        <div class="queue-req">${isPlaying ? 'Tocando agora' : `Pedido por: ${s.user}`}</div>
+        <div class="queue-name" title="${safeName}">${safeName}</div>
+        <div class="queue-req">${subText}</div>
       </div>
-      <div class="queue-duration">${s.formattedDuration}</div>
+      <div class="queue-duration">${escapeHtml(s.formattedDuration || '00:00')}</div>
+      ${actionsHtml}
     `;
+
+    if (!isPlaying) {
+      item.setAttribute('draggable', 'true');
+      item.addEventListener('dragstart', (e) => {
+        dragSourceIndex = idx;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(idx));
+      });
+      item.addEventListener('dragend', () => {
+        dragSourceIndex = null;
+        document.querySelectorAll('.queue-item').forEach((el) => el.classList.remove('dragging', 'drag-over'));
+      });
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (dragSourceIndex !== null && dragSourceIndex !== idx) {
+          item.classList.add('drag-over');
+        }
+      });
+      item.addEventListener('dragleave', () => {
+        item.classList.remove('drag-over');
+      });
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        item.classList.remove('drag-over');
+        const fromIdx = dragSourceIndex;
+        dragSourceIndex = null;
+        if (fromIdx !== null && fromIdx >= 1 && fromIdx !== idx) {
+          moveQueueItem(fromIdx, idx);
+        }
+      });
+    }
 
     container.appendChild(item);
   });
+
+  container.scrollTop = previousScrollTop;
 }
 
+async function sendPlayerAction(endpoint, body = {}, refreshDelayMs = 200) {
+  if (!currentGuildId) {
+    showToast('Nenhum servidor selecionado!', true);
+    return null;
+  }
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guildId: currentGuildId, ...body })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.message) showToast(data.message);
+      setTimeout(() => loadGuildQueue(currentGuildId), refreshDelayMs);
+    } else {
+      showToast(data.error || 'Erro ao executar comando', true);
+    }
+    return data;
+  } catch (err) {
+    showToast('Falha na comunicação com o servidor do bot', true);
+    return null;
+  }
+}
+
+window.jumpQueueItem = (index) => sendPlayerAction('/api/player/queue/jump', { index }, 500);
+window.moveQueueItem = (fromIndex, toIndex) => sendPlayerAction('/api/player/queue/move', { fromIndex, toIndex }, 100);
+window.removeQueueItem = (index) => sendPlayerAction('/api/player/queue/remove', { index }, 100);
+
 // ==============================================================
-// CONTROLES DO PLAYER (PLAY, PAUSE, SKIP, STOP, ETC.)
+// CONTROLES DO PLAYER (PLAY, PAUSE, SKIP, FILA, CALL, ETC.)
 // ==============================================================
 function setupPlayerControls() {
   const serverSelect = document.getElementById('server-select');
@@ -301,10 +454,11 @@ function setupPlayerControls() {
     loadGuildQueue(currentGuildId);
   });
 
-  // Botão Play Rápido
-  document.getElementById('btn-quick-play').addEventListener('click', async () => {
-    const query = document.getElementById('quick-play-input').value.trim();
+  async function triggerQuickPlay() {
+    const queryInput = document.getElementById('quick-play-input');
+    const query = queryInput.value.trim();
     const voiceChannelId = document.getElementById('quick-play-voice').value;
+    const mode = document.getElementById('quick-play-mode').value;
     if (!query) {
       showToast('Por favor, digite o nome de uma música ou link!', true);
       return;
@@ -315,125 +469,62 @@ function setupPlayerControls() {
     }
 
     showToast(`Buscando "${query}"...`);
-    try {
-      const res = await fetch('/api/player/play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId: currentGuildId, query, voiceChannelId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message);
-        document.getElementById('quick-play-input').value = '';
-        setTimeout(() => loadGuildQueue(currentGuildId), 1500);
-      } else {
-        showToast(data.error || 'Erro ao tocar música', true);
-      }
-    } catch (err) {
-      showToast('Falha na requisição ao servidor', true);
+    const data = await sendPlayerAction('/api/player/play', { query, voiceChannelId, mode }, 1400);
+    if (data?.success) {
+      queryInput.value = '';
+    }
+  }
+
+  // Botão Play Rápido + Enter no campo
+  document.getElementById('btn-quick-play').addEventListener('click', triggerQuickPlay);
+  document.getElementById('quick-play-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      triggerQuickPlay();
     }
   });
 
-  // Pausar / Despausar
-  document.getElementById('btn-pause').addEventListener('click', async () => {
-    if (!currentGuildId) return;
-    try {
-      const res = await fetch('/api/player/pause', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId: currentGuildId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message);
-        loadGuildQueue(currentGuildId);
-      } else {
-        showToast(data.error, true);
-      }
-    } catch (e) {
-      showToast('Erro ao alternar pausa', true);
+  // Mover bot para a call selecionada
+  document.getElementById('btn-move-voice').addEventListener('click', () => {
+    const voiceChannelId = document.getElementById('quick-play-voice').value;
+    if (!voiceChannelId) {
+      showToast('Escolha um canal de voz na lista ao lado para mover o bot!', true);
+      return;
     }
+    sendPlayerAction('/api/player/voice/move', { voiceChannelId }, 500);
   });
 
-  // Pular
-  document.getElementById('btn-skip').addEventListener('click', async () => {
-    if (!currentGuildId) return;
-    try {
-      const res = await fetch('/api/player/skip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId: currentGuildId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message);
-        setTimeout(() => loadGuildQueue(currentGuildId), 800);
-      } else {
-        showToast(data.error, true);
-      }
-    } catch (e) {
-      showToast('Erro ao pular faixa', true);
-    }
+  // Avançar / voltar clicando na barra de progresso
+  document.getElementById('progress-bar-seek').addEventListener('click', (e) => {
+    if (!currentGuildId || currentSongDurationSec <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const targetSec = Math.floor(ratio * currentSongDurationSec);
+    sendPlayerAction('/api/player/seek', { time: targetSec }, 400);
   });
 
-  // Parar
-  document.getElementById('btn-stop').addEventListener('click', async () => {
-    if (!currentGuildId) return;
-    try {
-      const res = await fetch('/api/player/stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId: currentGuildId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message);
-        loadGuildQueue(currentGuildId);
-      }
-    } catch (e) {
-      showToast('Erro ao parar música', true);
-    }
-  });
+  document.getElementById('btn-previous').addEventListener('click', () => sendPlayerAction('/api/player/previous', {}, 700));
+  document.getElementById('btn-pause').addEventListener('click', () => sendPlayerAction('/api/player/pause', {}, 150));
+  document.getElementById('btn-skip').addEventListener('click', () => sendPlayerAction('/api/player/skip', {}, 800));
+  document.getElementById('btn-stop').addEventListener('click', () => sendPlayerAction('/api/player/stop', {}, 300));
+  document.getElementById('btn-autoplay').addEventListener('click', () => sendPlayerAction('/api/player/autoplay', {}, 150));
+  document.getElementById('btn-repeat').addEventListener('click', () => sendPlayerAction('/api/player/repeat', {}, 150));
+  document.getElementById('btn-shuffle').addEventListener('click', () => sendPlayerAction('/api/player/shuffle', {}, 150));
 
-  // Autoplay
-  document.getElementById('btn-autoplay').addEventListener('click', async () => {
+  document.getElementById('btn-clear-queue').addEventListener('click', () => {
     if (!currentGuildId) return;
-    try {
-      const res = await fetch('/api/player/autoplay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId: currentGuildId })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message);
-        loadGuildQueue(currentGuildId);
-      } else {
-        showToast(data.error, true);
-      }
-    } catch (e) {
-      showToast('Erro ao alternar autoplay', true);
-    }
+    if (!confirm('Deseja limpar todas as músicas aguardando na fila (mantendo a música atual)?')) return;
+    sendPlayerAction('/api/player/queue/clear', {}, 150);
   });
 
   // Volume Slider
   const volumeSlider = document.getElementById('volume-slider');
-  volumeSlider.addEventListener('change', async (e) => {
+  volumeSlider.addEventListener('change', (e) => {
     const vol = e.target.value;
     document.getElementById('volume-val').textContent = `${vol}%`;
-    if (!currentGuildId) return;
-
-    try {
-      const res = await fetch('/api/player/volume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guildId: currentGuildId, volume: vol })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast(data.message);
-      }
-    } catch (e) {}
+    if (currentGuildId) {
+      sendPlayerAction('/api/player/volume', { volume: vol }, 200);
+    }
   });
 
   // Atualizar fila manualmente

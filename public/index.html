@@ -58,13 +58,16 @@
       <!-- Seletor de Servidor -->
       <div class="server-bar card">
         <div class="server-bar-left">
-          <label for="server-select">🎮 <strong>Servidor Selecionado:</strong></label>
+          <label for="server-select">🎮 <strong>Servidor:</strong></label>
           <select id="server-select" class="custom-select">
             <option value="">Carregando servidores...</option>
           </select>
         </div>
-        <div class="server-bar-right" id="server-vip-badge">
-          <span class="badge badge-normal">Carregando...</span>
+        <div class="server-bar-right">
+          <span class="badge badge-cyan" id="server-voice-pill" style="display: none;">🔊 Call: --</span>
+          <div id="server-vip-badge">
+            <span class="badge badge-normal">Carregando...</span>
+          </div>
         </div>
       </div>
 
@@ -73,7 +76,10 @@
         <div class="card now-playing-card">
           <div class="card-header">
             <h3>🎵 Tocando Agora</h3>
-            <span class="queue-status-badge" id="player-status-badge">Parado</span>
+            <div class="header-badges">
+              <span class="queue-status-badge badge badge-cyan" id="player-voice-badge" style="display: none;">🔊 Call: --</span>
+              <span class="queue-status-badge badge badge-normal" id="player-status-badge">Parado</span>
+            </div>
           </div>
 
           <div class="track-info-container">
@@ -88,9 +94,9 @@
               <h2 id="track-title" class="track-title">Nenhuma música tocando no momento</h2>
               <p class="track-meta" id="track-meta">Selecione um servidor e dê play abaixo!</p>
               
-              <!-- Barra de Progresso do Áudio -->
+              <!-- Barra de Progresso Interativa do Áudio -->
               <div class="progress-container">
-                <div class="progress-bar">
+                <div class="progress-bar seekable" id="progress-bar-seek" title="Clique na barra para avançar ou voltar na música">
                   <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
                 </div>
                 <div class="progress-times">
@@ -99,8 +105,11 @@
                 </div>
               </div>
 
-              <!-- Controles Interativos -->
+              <!-- Controles Interativos Completos (Owner) -->
               <div class="player-controls">
+                <button class="ctrl-btn" id="btn-previous" title="Voltar Música Anterior">
+                  <span>⏮️</span>
+                </button>
                 <button class="ctrl-btn" id="btn-pause" title="Pausar / Despausar">
                   <span id="pause-icon">⏸️</span>
                 </button>
@@ -110,40 +119,61 @@
                 <button class="ctrl-btn btn-danger" id="btn-stop" title="Parar e Sair">
                   <span>⏹️</span>
                 </button>
+                <button class="ctrl-btn btn-cyan-soft" id="btn-repeat" title="Alternar Repetição (Desligado / Música / Fila)">
+                  <span>🔁</span> <span id="repeat-text">Repetir: OFF</span>
+                </button>
                 <button class="ctrl-btn btn-gold" id="btn-autoplay" title="Alternar Autoplay">
-                  <span>📻</span> <span id="autoplay-text">Autoplay</span>
+                  <span>📻</span> <span id="autoplay-text">Autoplay: OFF</span>
                 </button>
               </div>
 
               <!-- Controle de Volume -->
               <div class="volume-control">
                 <span>🔊 Volume: <strong id="volume-val">100%</strong></span>
-                <input type="range" id="volume-slider" min="1" max="150" value="100" class="custom-slider">
+                <input type="range" id="volume-slider" min="1" max="200" value="100" class="custom-slider">
               </div>
             </div>
           </div>
 
-          <!-- Tocar Nova Música no Servidor -->
+          <!-- Tocar Nova Música & Trocar Call no Servidor -->
           <div class="quick-play-box">
-            <h4>⚡ Tocar Música pelo Painel:</h4>
+            <div class="quick-play-header">
+              <h4>⚡ Tocar & Controlar Call pelo Painel:</h4>
+              <span class="owner-hint" id="quick-play-call-hint">Nenhuma call conectada no momento</span>
+            </div>
             <div class="quick-play-form">
               <input type="text" id="quick-play-input" class="custom-input" placeholder="Digite o nome da música ou link do YouTube/Spotify...">
+              <select id="quick-play-mode" class="custom-select mode-select" title="Como adicionar a música">
+                <option value="queue">📥 Na fila</option>
+                <option value="next">⚡ Próxima (#1)</option>
+                <option value="now">⏭️ Tocar já!</option>
+              </select>
+              <button class="btn btn-primary" id="btn-quick-play">
+                <span>▶️ Tocar</span>
+              </button>
+            </div>
+            <div class="quick-voice-row">
               <select id="quick-play-voice" class="custom-select voice-select">
                 <option value="">Canal de voz automático</option>
               </select>
-              <button class="btn btn-primary" id="btn-quick-play">
-                <span>▶️ Tocar Agora</span>
+              <button class="btn btn-outline btn-voice-move" id="btn-move-voice" title="Mover o bot agora para a call selecionada">
+                <span>🔊 Mover Bot p/ Call</span>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Fila de Reprodução -->
+        <!-- Fila de Reprodução Editável (Owner) -->
         <div class="card queue-card">
-          <div class="card-header">
-            <h3>📜 Fila de Espera (<span id="queue-count">0</span>)</h3>
-            <button class="btn btn-sm btn-outline" id="btn-refresh-queue">🔄 Atualizar</button>
+          <div class="card-header queue-card-header">
+            <h3>📜 Fila (<span id="queue-count">0</span>)</h3>
+            <div class="queue-toolbar">
+              <button class="btn btn-sm btn-outline" id="btn-shuffle" title="Embaralhar fila">🔀 Embaralhar</button>
+              <button class="btn btn-sm btn-outline btn-danger-outline" id="btn-clear-queue" title="Limpar fila de espera">🗑️ Limpar</button>
+              <button class="btn btn-sm btn-outline" id="btn-refresh-queue" title="Atualizar fila">🔄</button>
+            </div>
           </div>
+          <p class="queue-owner-tip">Arraste as faixas ou use os botões para pular, reordenar ou remover músicas.</p>
           <div class="queue-list" id="queue-list">
             <div class="empty-state">
               <span>🎵</span>

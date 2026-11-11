@@ -340,11 +340,14 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const isVip = vipManager.isGuildVip(guildId);
     const song = queue.songs[0];
     const requesterInfo = voiceSession.formatSongRequesterInfo(queue, song);
+    const voiceChannelName =
+      queue.voiceChannel?.name || distube.voices.get(guildId)?.channel?.name || null;
+    const callInfo = voiceChannelName ? `\n🔊 **Call:** ${voiceChannelName}` : '';
     const controllerId = voiceSession.resolveCallHostId(guildId, song.user?.id);
     const embed = new EmbedBuilder()
       .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
       .setTitle(isVip ? '👑 Tocando Agora • VIP' : '🎵 Tocando Agora')
-      .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • ${requesterInfo}`);
+      .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • ${requesterInfo}${callInfo}`);
 
     if (song.thumbnail) {
       embed.setThumbnail(song.thumbnail);
