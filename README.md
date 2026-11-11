@@ -1,102 +1,142 @@
-# 🎵 Bot de Música para Discord
+# 🎵 Chlorine Music™
 
-Bot completo de música para Discord desenvolvido em **Node.js** utilizando a biblioteca **Discord.js v14** e **DisTube** com suporte a busca de músicas por nome no YouTube, links do YouTube, Spotify e SoundCloud.
-
----
-
-## 🚀 Funcionalidades
-
-- 🔍 **Busca inteligente por nome**: Digite `!play nome da música` e ele busca e toca automaticamente.
-- 🔗 **Suporte a links**: Aceita links do YouTube (vídeos e playlists), links de faixas do Spotify, etc.
-- 📜 **Fila de reprodução (Queue)**: Músicas enfileiradas automaticamente.
-- ⏭️ **Comandos de controle**: Pular (`!skip`), Parar (`!stop`), Pausar (`!pause`), Despausar (`!resume`), Ajustar Volume (`!volume`).
-- 🎨 **Embeds visuais**: Mensagens organizadas informando o que está tocando, duração e quem pediu.
-- ⚡ **FFmpeg Integrado**: Utiliza `ffmpeg-static`, funcionando direto no Windows sem precisar instalar FFmpeg no sistema.
+Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v14** e **DisTube v5**, com áudio de alta fidelidade (**Opus nativo**), sistema de planos **VIP** com embeds dourados, controle exclusivo de call para **quem puxou o bot** (inclusive no Autoplay) e **Painel de Controle Web Localhost**.
 
 ---
 
-## 📋 Lista de Comandos
+## ✨ Funcionalidades Atuais
+
+- 🔍 **Reprodução Multi-Plataforma:** Busca inteligente por nome e suporte a links/playlists via `@distube/youtube`, `@distube/spotify`, `@distube/yt-dlp` (e suporte opcional a `cookies.txt` para o YouTube).
+- 🔊 **Áudio HD Estável:** Utiliza `@discordjs/opus` nativo (evitando engasgos e quedas prematuras em mixes longos), `ffmpeg-static` integrado e estabilizador de conexão de voz no Discord.
+- 👑 **Controle Exclusivo de Call (Skip & Autoplay):**
+  - Quem puxar o bot para o canal de voz primeiro (`/play` ou `!play`) torna-se o responsável pela chamada.
+  - Mesmo que outros membros adicionem músicas à fila ou que o **Autoplay** esteja ativo tocando músicas recomendadas, **apenas quem puxou o bot para a call** pode pular faixas (`!skip` / botão `⏭️ Pular`) e controlar os botões do player.
+- 🎮 **Player Interativo sem Poluição:** Card de *Tocando Agora* com capa, duração e botões (`⏸️ Pausar / ▶️ Despausar`, `⏭️ Pular`, `⏹️ Parar`).
+- 🚀 **Slash Commands Enxutos (`/`):** Apenas os 3 comandos principais registrados globalmente (`/play`, `/vip`, `/help`) para manter o perfil do bot limpo, junto do prefixo `!` completo no chat.
+- 💬 **Status Personalizado & Menção:** Status `!play ou /play | Música` e resposta automática com card e botão de convite ao mencionar `@Chlorine Music™`.
+- 💎 **Sistema Chlorine VIP:**
+  - Planos disponíveis diretamente em `/vip` ou `!vip`, com botão para o servidor oficial e embeds dourados para servidores VIP.
+  - Aviso único para usuários sem VIP que tentam comandos bloqueados (evita spam no chat).
+- 🌐 **Painel Web Localhost (`http://localhost:3000`):** Controle completo de músicas por servidor, fila ao vivo, geração/gerenciamento de chaves VIP e ativação direta com 1 clique.
+
+---
+
+## 📋 Comandos do Bot
+
+### 🚀 Comandos de Barra Principais (`/`)
+
+| Comando | Descrição |
+| :--- | :--- |
+| `/play <musica>` | Busca e toca uma música ou playlist no canal de voz atual |
+| `/vip` | Exibe o status e tempo restante do VIP do servidor ou os planos disponíveis |
+| `/help` | Mostra a central de comandos e ajuda |
+
+### 🎵 Comandos de Chat (`!`) — Livres
 
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
-| `!play <nome ou link>` | `!p` | Toca uma música pelo nome ou link |
-| `!stop` | `!parar`, `!leave`, `!sair` | Para a música, esvazia a fila e sai da chamada |
-| `!pause` | `!pausar` | Pausa a música atual |
-| `!resume` | `!despausar`, `!continuar`, `!unpause` | Continua a música pausada |
-| `!queue` | `!q`, `!fila` | Mostra as próximas músicas da fila |
-| `!nowplaying` | `!np`, `!tocando` | Mostra detalhes da música tocando agora |
-| `!vip` | `!premium` | Exibe os planos VIP ou status do VIP do servidor |
-| `!skip` *(VIP)* | `!s`, `!pular`, `!next` | Pula para a próxima música *(Exclusivo VIP)* |
-| `!volume <1-200>` *(VIP)* | `!vol`, `!v` | Ajusta o volume de 1% a 200% *(Exclusivo VIP)* |
-| `!autoplay` *(VIP)* | `!ap`, `!auto` | Liga/desliga reprodução contínua *(Exclusivo VIP)* |
-| `!help` | `!ajuda`, `!comandos`, `!h` | Exibe o menu de ajuda completo |
-| `@Chlorine Music™` | *(menção)* | Card de boas-vindas com dados e botão de convite |
+| `!play <nome ou link>` | `!p` | Toca uma música ou adiciona à fila |
+| `!pause` | `!pausar` | Pausa a reprodução atual |
+| `!resume` | `!despausar`, `!continuar`, `!unpause` | Retoma a música pausada |
+| `!stop` | `!parar`, `!leave`, `!sair` | Para a música, limpa a fila e desconecta da chamada |
+| `!queue` | `!q`, `!fila` | Lista as próximas músicas, volume e status do autoplay |
+| `!nowplaying` | `!np`, `!tocando` | Exibe detalhes e controles da faixa atual |
+| `!vip` | `!premium` | Mostra os planos VIP ou status VIP do servidor |
+| `!help` | `!ajuda`, `!comandos`, `!h` | Exibe o painel de comandos |
+| `@Chlorine Music™` | *(menção)* | Mostra informações do bot e botão para adicioná-lo |
+
+### 👑 Comandos Exclusivos VIP (`!`)
+
+| Comando | Abreviações | Descrição |
+| :--- | :--- | :--- |
+| `!skip` | `!s`, `!pular`, `!next` | Pula a faixa atual *(exclusivo para quem puxou o bot para a call)* |
+| `!volume <1-200>` | `!vol`, `!v` | Ajusta o volume HD do player entre `1%` e `200%` |
+| `!autoplay` | `!ap`, `!auto` | Ativa/desativa a reprodução contínua de músicas recomendadas |
+
+---
+
+## 💎 Planos VIP
+
+| Plano | Duração | Valor |
+| :--- | :--- | :--- |
+| 🥉 **Plano Bronze** | 7 Dias | `R$ 4,90` |
+| 🥈 **Plano Prata** | 15 Dias | `R$ 8,90` |
+| 🥇 **Plano Ouro** *(Mais Popular)* | 30 Dias (Mensal) | `R$ 14,90` |
+| 💎 **Plano Platina** | 90 Dias (Trimestral) | `R$ 34,90` |
+| 👑 **Plano Supremo** *(Melhor Custo-Benefício)* | 1 Ano (Anual) | `R$ 79,90` |
+
+🔗 **Servidor Oficial / Contratação VIP:** [discord.gg/6MFj275a3S](https://discord.gg/6MFj275a3S)
 
 ---
 
 ## 🌐 Painel de Controle Web (Localhost)
 
-Ao iniciar o bot, um painel moderno fica automaticamente disponível no seu navegador em:
+Ao iniciar o bot, o painel web abre localmente em:
+
 👉 **`http://localhost:3000`**
 
-- 🎛️ **Comandar o Bot pelo Site:** Dê play, pause, skip, ajuste o volume e veja a fila ao vivo.
-- 👑 **Gerenciador de Códigos VIP:** Gere chaves aleatórias nos planos de 7 dias, 15 dias, 30 dias, 90 dias ou 1 ano.
-- ⚡ **Ativação Direta:** Ative ou revogue VIP de servidores com 1 clique.
-- 🌍 **Monitoramento:** Acompanhe todos os servidores conectados e o ping do bot.
+* **🎛️ Player & Músicas:** Escolha o servidor e controle `Play`, `Pause`, `Skip`, `Stop`, `Autoplay`, seleção de canal de voz, volume e fila ao vivo.
+* **👑 Sistema VIP:** Gere chaves aleatórias por plano (7, 15, 30, 90 ou 365 dias), visualize chaves ativas/resgatadas e ative ou remova VIP de servidores diretamente.
+* **🌍 Servidores:** Monitore servidores conectados, fila ativa e ping do bot em tempo real.
 
 ---
 
-## 🛠️ Passo a Passo para Configurar o Bot
+## 📁 Estrutura do Projeto
 
-### 1. Criar a Aplicação no Portal de Desenvolvedores do Discord
-1. Acesse o [Discord Developer Portal](https://discord.com/developers/applications).
-2. Clique no botão azul **"New Application"** no canto superior direito.
-3. Dê um nome para o seu bot (ex: `MusicBot`) e clique em **Create**.
+```text
+discord-music-bot/
+├── index.js                    # Núcleo do bot Discord, comandos, botões e eventos DisTube
+├── src/
+│   ├── dashboardServer.js      # Servidor Express e API do painel web (localhost:3000)
+│   ├── vipManager.js           # Persistência e gestão de planos/chaves VIP
+│   └── voiceSessionManager.js  # Controle do responsável da call e permissão de skip/autoplay
+├── public/                     # Interface web (HTML, CSS e JS) do painel localhost
+├── assets/                     # Imagens e ícones dos embeds e do painel
+├── data/                       # Banco JSON local do sistema VIP (vip_database.json)
+├── iniciar.bat                 # Atalho rápido no Windows com suporte UTF-8 (chcp 65001)
+├── iniciar-bot.bat             # Launcher estilizado no Windows com verificação de saída
+├── .env.example                # Modelo das variáveis de ambiente
+└── package.json                # Dependências e scripts do projeto
+```
 
-### 2. Criar o Bot e Obter o Token
-1. No menu lateral esquerdo, clique em **Bot**.
-2. Clique em **Reset Token** (ou **Add Bot** caso seja a primeira vez) e confirme.
-3. **Copie o Token gerado**. *(Guarde com segurança, nunca compartilhe esse token publicamente!)*
-4. Role a página até a seção **Privileged Gateway Intents** e ATIVE as 3 opções (ou pelo menos a crucial):
-   - ✅ **Presence Intent**
-   - ✅ **Server Members Intent**
-   - ✅ **Message Content Intent** *(OBRIGATÓRIO para o bot conseguir ler os comandos `!play`)*
-5. Clique em **Save Changes** no rodapé.
+---
 
-### 3. Convidar o Bot para o seu Servidor
-1. No menu lateral esquerdo, clique em **OAuth2** -> **URL Generator**.
-2. Na seção **Scopes**, marque:
-   - ✅ `bot`
-3. Na seção **Bot Permissions** que aparecer logo abaixo, marque:
-   - ✅ `Send Messages`
-   - ✅ `Embed Links`
-   - ✅ `Attach Files`
-   - ✅ `Read Message History`
-   - ✅ `Connect`
-   - ✅ `Speak`
-   *(Ou se for um servidor próprio de testes, pode selecionar `Administrator`).*
-4. No final da página, copie a **Generated URL**, cole no seu navegador e selecione o servidor do Discord para onde deseja adicionar o bot.
+## 🛠️ Instalação e Configuração
 
-### 4. Configurar o Token no Projeto
-1. Abra o arquivo `.env` localizado na pasta do projeto:
-   ```env
-   DISCORD_TOKEN=cole_seu_token_aqui
-   ```
-2. Salve o arquivo.
+### 1. Pré-requisitos e Dependências
+Certifique-se de ter o **Node.js** instalado e execute na pasta do projeto:
 
-### 5. Iniciar o Bot
-No terminal ou prompt de comando dentro da pasta do bot, execute:
 ```bash
-npm start
+npm install
 ```
 
-Você verá a mensagem:
-```
-🤖 Bot online com sucesso como: SeuBot#0000
-🎶 Digite !play <música> no Discord para tocar!
+### 2. Discord Developer Portal
+1. Crie uma aplicação em [Discord Developer Portal](https://discord.com/developers/applications) e adicione um **Bot**.
+2. Em **Bot > Privileged Gateway Intents**, ative:
+   * ✅ **Presence Intent**
+   * ✅ **Server Members Intent**
+   * ✅ **Message Content Intent** *(obrigatório para comandos `!` no chat)*
+3. Em **OAuth2 > URL Generator**, marque os escopos `bot` e `applications.commands`, além das permissões de texto e voz (`Send Messages`, `Embed Links`, `Attach Files`, `Read Message History`, `Connect`, `Speak`).
+
+### 3. Configurar Variáveis de Ambiente (`.env`)
+Crie ou edite o arquivo `.env` na raiz do projeto (baseado em `.env.example`):
+
+```env
+DISCORD_TOKEN=seu_token_do_discord_aqui
+SUPPORT_SERVER_URL=https://discord.gg/6MFj275a3S
+PORT=3000
 ```
 
-Agora, basta entrar em um canal de voz no seu servidor do Discord e digitar:
-```
-!play nome de qualquer musica
-```
+*(Opcional: caso utilize cookies do YouTube para evitar bloqueios de extração, adicione um arquivo `cookies.txt` na raiz do projeto.)*
+
+### 4. Iniciar o Bot
+
+* **No Windows (recomendado, já ativa UTF-8 para acentos e emojis):** dê duplo clique em **`iniciar.bat`** ou **`iniciar-bot.bat`**.
+* **Via terminal:**
+  ```bash
+  npm start
+  ```
+
+---
+
+<p align="center">© 2026 Chlorine Music™ • Desenvolvido por .nolasco7</p>
