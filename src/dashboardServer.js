@@ -3,10 +3,7 @@ const path = require('path');
 const vipManager = require('./vipManager');
 const { normalizePlayQuery } = require('./spotifyPlugin');
 
-function createDashboardServer(client, distube, port = 3000, {
-  quiet = false,
-  host = process.env.HOST || process.env.DASHBOARD_HOST
-} = {}) {
+function createDashboardServer(client, distube, port = 3000, { quiet = false } = {}) {
   const app = express();
 
   app.use(express.json());
@@ -609,24 +606,11 @@ function createDashboardServer(client, distube, port = 3000, {
     }
   });
 
-  // Inicia o servidor HTTP com fallback IPv4 e proteção contra erro de porta em containers Linux
-  const onListening = () => {
+  // Inicia o servidor HTTP
+  const server = app.listen(port, () => {
     if (!quiet) {
-      const displayHost = host || 'localhost';
-      console.log(`\x1b[1;95m[PAINEL WEB]\x1b[0m \x1b[1;37m🌐 Painel de Controle Chlorine Music disponível em: \x1b[1;32mhttp://${displayHost}:${port}\x1b[0m`);
+      console.log(`\x1b[1;95m[PAINEL WEB]\x1b[0m \x1b[1;37m🌐 Painel de Controle Chlorine Music disponível em: \x1b[1;32mhttp://localhost:${port}\x1b[0m`);
     }
-  };
-
-  const server = host ? app.listen(port, host, onListening) : app.listen(port, onListening);
-  let retriedIpv4 = false;
-
-  server.on('error', (err) => {
-    if (!retriedIpv4 && !host && (err?.code === 'EAFNOSUPPORT' || err?.code === 'EADDRNOTAVAIL')) {
-      retriedIpv4 = true;
-      server.listen(port, '0.0.0.0');
-      return;
-    }
-    console.error(`\x1b[1;91m[PAINEL WEB]\x1b[0m Falha ao iniciar servidor na porta ${port}:`, err?.message || err);
   });
 
   return { app, server };

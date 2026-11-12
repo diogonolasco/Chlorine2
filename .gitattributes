@@ -1,3 +1,0 @@
-*.sh text eol=lf
-.shardcloud text eol=lf
-*.bat text eol=crlf
