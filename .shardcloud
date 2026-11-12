@@ -1,0 +1,6 @@
+DISPLAY_NAME=Chlorine Music
+DESCRIPTION=Bot de musica para Discord em Node.js com YouTube, Spotify e Painel Web
+MAIN=index.js
+MEMORY=512
+VERSION=recommended
+LANGUAGE=node

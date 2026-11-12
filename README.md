@@ -107,6 +107,7 @@ discord-music-bot/
 ├── src/
 │   ├── dashboardServer.js        # Servidor Express e API REST do painel web (localhost:3000 ou PORT)
 │   ├── embedHelper.js            # Paleta oficial (#8018D8, #FFD700, #EF4444) e builders de embeds
+│   ├── linuxCompat.js            # Compatibilidade Linux/containers (yt-dlp standalone ELF, FFmpeg fallback e +x)
 │   ├── playerEmojis.js           # Sincronização e cache dos 16 Application Emojis (botões e embeds)
 │   ├── queueHelper.js            # Menu interativo numerado da fila e salto direto (!queue)
 │   ├── spotifyPlugin.js          # Suporte completo a links, URIs e playlists do Spotify
@@ -120,10 +121,13 @@ discord-music-bot/
 ├── data/
 │   ├── player_emojis.json        # Cache local dos IDs dos Application Emojis sincronizados
 │   └── vip_database.json         # Banco JSON local de chaves e servidores VIP
+├── .shardcloud                   # Configuração pronta para deploy automático na ShardCloud (Linux / Node)
 ├── iniciar.bat                   # Launcher Windows em Roxo Neon com UTF-8, checagens e inicialização limpa
+├── iniciar.sh                    # Launcher Linux (Ubuntu/Debian/VPS) com checagens e inicialização limpa
+├── .gitattributes                # Garante quebra de linha LF em arquivos Linux (.sh e .shardcloud)
 ├── .env.example                  # Modelo completo das variáveis de ambiente
 ├── .gitignore                    # Regras de arquivos ignorados (node_modules, .env, logs)
-└── package.json                  # Dependências e scripts do projeto
+└── package.json                  # Dependências, engines Node >= 20 e scripts do projeto
 ```
 
 ---
@@ -165,11 +169,38 @@ SPOTIFY_COUNTRY=BR
 
 ### 4. Iniciar o Bot
 
-* **No Windows (recomendado, já ativa UTF-8 para acentos e emojis):** dê duplo clique em **[`iniciar.bat`](iniciar.bat)**.
-* **Via terminal:**
+* **No Windows:** dê duplo clique em **[`iniciar.bat`](iniciar.bat)**.
+* **No Linux (Ubuntu / Debian / VPS):**
+  ```bash
+  chmod +x iniciar.sh
+  ./iniciar.sh
+  ```
+* **Via terminal (Windows ou Linux):**
   ```bash
   npm start
   ```
+
+---
+
+## ☁️ Deploy na ShardCloud (Linux)
+
+O projeto já inclui suporte completo para containers Linux e o arquivo [`.shardcloud`](.shardcloud) pré-configurado na raiz (`MAIN=index.js`, `MEMORY=512`, `LANGUAGE=node`, `VERSION=recommended`).
+
+### O que o bot ajusta automaticamente no Linux
+* **Binário standalone do `yt-dlp`:** em containers Node.js sem `python3`, configura o `yt-dlp_linux` / `yt-dlp_linux_aarch64` nativo automaticamente com permissão de execução (`chmod 0755`).
+* **FFmpeg inteligente:** usa o `ffmpeg-static` com ajuste automático de permissão (`+x`) e faz fallback transparente para o `ffmpeg` global do container Linux (como o pré-instalado na ShardCloud).
+* **Codecs e Criptografia:** utiliza `@snazzah/davey` (E2EE DAVE com pré-builds Linux) + fallback puro JS (`opusscript`) caso não haja compilador C++ no container para `@discordjs/opus`.
+* **Logs & Shutdown seguro:** evita `console.clear()` em terminais sem TTY, protege erros de bind de porta no Painel Web e encerra filas de voz graciosamente ao receber `SIGINT`/`SIGTERM`.
+
+### Passo a passo para subir na ShardCloud
+1. **Via GitHub (recomendado)** ou **via `.zip`**:
+   * Se enviar por `.zip`, **não inclua** `node_modules/` nem `.env` (a ShardCloud instala as dependências do Linux automaticamente e os arquivos seguem com line ending `LF`).
+   * Certifique-se de que `.shardcloud` esteja na raiz do envio.
+2. No painel da **ShardCloud**, acesse **Variáveis de Ambiente (Env)** da aplicação e configure:
+   * `DISCORD_TOKEN` *(obrigatório — token do seu bot no Discord Developer Portal)*
+   * `SUPPORT_SERVER_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_COUNTRY` *(opcionais)*
+   * > ⚠️ **Segurança do Painel Web:** evite expor `SUBDOMAIN` publicamente na ShardCloud caso não deseje que visitantes externos acessem o Painel de Controle sem autenticação.
+3. Inicie a aplicação pela dashboard da ShardCloud (recomendado **512 MB de RAM** ou superior).
 
 ---
 

@@ -17,9 +17,32 @@ const {
   Routes
 } = require('discord.js');
 const { DisTube } = require('distube');
+const {
+  prepareDataDirectory,
+  prepareYtDlpEnvironment,
+  resolveFfmpegPath,
+  syncYtDlpPermissionsLater
+} = require('./src/linuxCompat');
+
+prepareDataDirectory(__dirname);
+let ytdlpPkgDir;
+try {
+  ytdlpPkgDir = path.resolve(require.resolve('@distube/yt-dlp'), '..', '..');
+} catch {
+  ytdlpPkgDir = path.join(__dirname, 'node_modules', '@distube', 'yt-dlp');
+}
+const ytdlpEnv = prepareYtDlpEnvironment({
+  rootDir: __dirname,
+  ytdlpPkgDir
+});
+
 const { YouTubePlugin } = require('@distube/youtube');
 const { YtDlpPlugin } = require('@distube/yt-dlp');
-const ffmpegStatic = require('ffmpeg-static');
+let ffmpegStatic = null;
+try {
+  ffmpegStatic = require('ffmpeg-static');
+} catch {}
+const resolvedFfmpeg = resolveFfmpegPath({ ffmpegStaticPath: ffmpegStatic });
 const { createSpotifyPlugin } = require('./src/spotifyPlugin');
 const vipManager = require('./src/vipManager');
 const { createDashboardServer } = require('./src/dashboardServer');
@@ -55,7 +78,7 @@ if (fs.existsSync(cookiesPath)) {
 const distube = new DisTube(client, {
   emitNewSongOnly: true,
   ffmpeg: {
-    path: ffmpegStatic
+    path: resolvedFfmpeg.path
   },
   plugins: [
     new YouTubePlugin(ytCookies ? { cookies: ytCookies } : {}),
@@ -118,10 +141,14 @@ function renderBoxLine(label, value, totalWidth = 56) {
   return `  ║  ${label} ${value}${' '.repeat(spaces)}║`;
 }
 
+let dashboardHandle = null;
+
 // Quando o bot estiver online
 client.once('clientReady', async () => {
-  const dashboardPort = process.env.PORT || 3000;
-  console.clear();
+  const dashboardPort = Number(process.env.PORT) || 3000;
+  if (process.stdout.isTTY) {
+    console.clear();
+  }
   const c = colors;
   console.log(c.purple + '  ██████╗██╗  ██╗██╗      ██████╗ ██████╗ ██╗███╗   ██╗███████╗' + c.reset);
   console.log(c.purple + ' ██╔════╝██║  ██║██║     ██╔═══██╗██╔══██╗██║████╗  ██║██╔════╝' + c.reset);
@@ -146,10 +173,13 @@ client.once('clientReady', async () => {
 
   // Inicia o Painel Web Localhost
   try {
-    createDashboardServer(client, distube, dashboardPort, { quiet: true });
+    dashboardHandle = createDashboardServer(client, distube, dashboardPort, { quiet: true });
   } catch (err) {
     console.error(`${c.red}[ERRO]${c.reset} Falha ao iniciar Painel Web:`, err?.message || err);
   }
+
+  // No Linux/containers, garante permissão +x no binário yt-dlp após download inicial em background
+  syncYtDlpPermissionsLater({ binaryPath: ytdlpEnv.binaryPath });
 
   // Registra os Slash Commands globalmente para aparecerem no perfil do bot
   try {
@@ -282,12 +312,60 @@ distube.on('error', (error, queue) => {
   }
 });
 
-// Inicia o bot com o Token do arquivo .env
+// Inicia o bot com o Token (.env local ou variável de ambiente do container/ShardCloud)
 const token = process.env.DISCORD_TOKEN;
 if (!token || token === 'SEU_TOKEN_AQUI') {
-  console.error('❌ ERRO: O token do bot não foi configurado no arquivo .env!');
-  console.error('Abra o arquivo .env e cole o seu DISCORD_TOKEN para poder rodar o bot.');
+  console.error('❌ ERRO: O DISCORD_TOKEN não foi configurado!');
+  console.error('Configure no arquivo .env local ou nas Variáveis de Ambiente do painel (ShardCloud).');
   process.exit(1);
 }
+
+// Evita queda abrupta por rejeições assíncronas transitórias de rede/voz no Linux
+process.on('unhandledRejection', (reason) => {
+  console.error(`  ${colors.red}[ERRO ASSÍNCRONO]${c.reset}`, reason?.message || reason);
+});
+
+let isShuttingDown = false;
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n  ${colors.yellow}[SISTEMA]${c.reset} Encerrando Chlorine Music (${signal})...`);
+
+  try {
+    for (const guildId of client.guilds.cache.keys()) {
+      try {
+        await distube.voices.leave(guildId);
+      } catch {}
+    }
+  } catch {}
+
+  if (dashboardHandle?.server) {
+    await new Promise((resolve) => {
+      const fallbackTimer = setTimeout(resolve, 2500);
+      if (typeof fallbackTimer.unref === 'function') fallbackTimer.unref();
+      try {
+        dashboardHandle.server.close(() => {
+          clearTimeout(fallbackTimer);
+          resolve();
+        });
+        if (typeof dashboardHandle.server.closeAllConnections === 'function') {
+          dashboardHandle.server.closeAllConnections();
+        }
+      } catch {
+        clearTimeout(fallbackTimer);
+        resolve();
+      }
+    });
+  }
+
+  try {
+    await client.destroy();
+  } catch {}
+
+  process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 client.login(token);
