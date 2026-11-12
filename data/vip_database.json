@@ -13,6 +13,20 @@
       "usedInGuildId": "958350490452774913",
       "usedInGuildName": "Crimson Knights",
       "usedAt": 1794281420015
+    },
+    "CHLORINE-VIP-7D-57DDE3-F6DBDA": {
+      "code": "CHLORINE-VIP-7D-57DDE3-F6DBDA",
+      "planId": "7d",
+      "planName": "Plano Bronze (7 Dias)",
+      "durationDays": 7,
+      "createdAt": 1794436057053,
+      "createdBy": "Dashboard Localhost",
+      "note": "Painel Local",
+      "used": true,
+      "usedBy": "767166234117931048",
+      "usedInGuildId": "1500878945879457874",
+      "usedInGuildName": "anonimos",
+      "usedAt": 1794436067956
     }
   },
   "guilds": {
@@ -35,6 +49,28 @@
       "durationDays": 365,
       "activatedAt": 1794282954908,
       "expiresAt": 1857354944917,
+      "activatedBy": "767166234117931048",
+      "note": ""
+    },
+    "1500878945879457874": {
+      "guildId": "1500878945879457874",
+      "guildName": "anonimos",
+      "planId": "7d",
+      "planName": "Plano Bronze (7 Dias)",
+      "durationDays": 7,
+      "activatedAt": 1794436067956,
+      "expiresAt": 1795040867956,
+      "activatedBy": "767166234117931048",
+      "keyCode": "CHLORINE-VIP-7D-57DDE3-F6DBDA"
+    },
+    "1230550242102087720": {
+      "guildId": "1230550242102087720",
+      "guildName": "S.G.V",
+      "planId": "90d",
+      "planName": "Plano Platina (90 Dias)",
+      "durationDays": 90,
+      "activatedAt": 1794453612124,
+      "expiresAt": 1802229612124,
       "activatedBy": "767166234117931048",
       "note": ""
     }

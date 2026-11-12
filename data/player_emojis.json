@@ -1,0 +1,66 @@
+{
+  "pause": {
+    "id": "1570263899683561646",
+    "name": "chlorine_pause"
+  },
+  "play": {
+    "id": "1570263902669774960",
+    "name": "chlorine_play"
+  },
+  "skip": {
+    "id": "1570263903634464839",
+    "name": "chlorine_skip"
+  },
+  "stop": {
+    "id": "1570263905354121246",
+    "name": "chlorine_stop"
+  },
+  "playing": {
+    "id": "1570281401952239616",
+    "name": "chlorine_playing"
+  },
+  "headset": {
+    "id": "1570281403239632906",
+    "name": "chlorine_headset"
+  },
+  "note": {
+    "id": "1570281404451913778",
+    "name": "chlorine_note"
+  },
+  "vip": {
+    "id": "1570281405789773894",
+    "name": "chlorine_vip"
+  },
+  "gem": {
+    "id": "1570281407261974568",
+    "name": "chlorine_gem"
+  },
+  "bolt": {
+    "id": "1570281408168202383",
+    "name": "chlorine_bolt"
+  },
+  "help": {
+    "id": "1570281413687779369",
+    "name": "chlorine_help"
+  },
+  "queue": {
+    "id": "1570281415134683368",
+    "name": "chlorine_queue"
+  },
+  "volume": {
+    "id": "1570281416237785103",
+    "name": "chlorine_volume"
+  },
+  "autoplay": {
+    "id": "1570281417936736356",
+    "name": "chlorine_autoplay"
+  },
+  "clock": {
+    "id": "1570281419354148914",
+    "name": "chlorine_clock"
+  },
+  "user": {
+    "id": "1570281420570501180",
+    "name": "chlorine_user"
+  }
+}

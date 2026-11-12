@@ -1,11 +1,18 @@
 const express = require('express');
 const path = require('path');
 const vipManager = require('./vipManager');
+const { normalizePlayQuery } = require('./spotifyPlugin');
 
-function createDashboardServer(client, distube, port = 3000) {
+function createDashboardServer(client, distube, port = 3000, { quiet = false } = {}) {
   const app = express();
 
   app.use(express.json());
+  app.use((req, _res, next) => {
+    if (!req.body || typeof req.body !== 'object') {
+      req.body = {};
+    }
+    next();
+  });
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
 
@@ -142,7 +149,7 @@ function createDashboardServer(client, distube, port = 3000) {
       guild: {
         id: guild.id,
         name: guild.name,
-        icon: guild.iconURL({ dynamic: true }) || null,
+        icon: (typeof guild.iconURL === 'function' ? guild.iconURL({ dynamic: true }) : null) || null,
         memberCount: guild.memberCount,
         isVip,
         vipInfo
@@ -171,7 +178,8 @@ function createDashboardServer(client, distube, port = 3000) {
   // 3. Tocar / Adicionar Música no Servidor pelo Painel (com suporte a fila, próxima ou imediata)
   app.post('/api/player/play', async (req, res) => {
     const { guildId, query, voiceChannelId, mode = 'queue' } = req.body;
-    if (!guildId || !query) {
+    const normalizedQuery = normalizePlayQuery(query);
+    if (!guildId || !normalizedQuery) {
       return res.status(400).json({ error: 'Parâmetros guildId e query são obrigatórios!' });
     }
 
@@ -226,7 +234,7 @@ function createDashboardServer(client, distube, port = 3000) {
     }
 
     try {
-      await distube.play(voiceChannel, query, playOptions);
+      await distube.play(voiceChannel, normalizedQuery, playOptions);
 
       const actionLabel =
         mode === 'now' && existingQueue
@@ -240,13 +248,13 @@ function createDashboardServer(client, distube, port = 3000) {
       return res.json({
         success: true,
         voiceChannel: { id: voiceChannel.id, name: voiceChannel.name },
-        message: `${actionLabel}: "${query}" na call 🔊 ${voiceChannel.name}!`
+        message: `${actionLabel}: "${normalizedQuery}" na call 🔊 ${voiceChannel.name}!`
       });
     } catch (err) {
       if (existingQueue && mode === 'now') {
         existingQueue._isSkipped = false;
       }
-      console.error('[Dashboard API] Erro ao tocar:', err);
+      console.error('[Painel Web] Erro ao tocar:', err?.message || err);
       return res.status(500).json({ error: err.message || 'Erro ao processar música' });
     }
   });
@@ -600,7 +608,9 @@ function createDashboardServer(client, distube, port = 3000) {
 
   // Inicia o servidor HTTP
   const server = app.listen(port, () => {
-    console.log(`\x1b[1;33m[PAINEL WEB]\x1b[0m \x1b[1;36m🌐 Painel de Controle Chlorine Music disponível em: \x1b[1;32mhttp://localhost:${port}\x1b[0m`);
+    if (!quiet) {
+      console.log(`\x1b[1;95m[PAINEL WEB]\x1b[0m \x1b[1;37m🌐 Painel de Controle Chlorine Music disponível em: \x1b[1;32mhttp://localhost:${port}\x1b[0m`);
+    }
   });
 
   return { app, server };

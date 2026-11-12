@@ -1,24 +1,33 @@
 const fs = require('fs');
 const path = require('path');
 const {
-  EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   AttachmentBuilder,
-  SlashCommandBuilder
+  SlashCommandBuilder,
+  PermissionFlagsBits
 } = require('discord.js');
 const { buildQueueMessagePayload, jumpToQueuePosition } = require('./src/queueHelper');
+const { normalizePlayQuery } = require('./src/spotifyPlugin');
+const { createPlayerEmojiManager } = require('./src/playerEmojis');
+const {
+  EMBED_COLOR,
+  GOLD_COLOR,
+  FOOTER_TEXT,
+  DEFAULT_SUPPORT_URL,
+  truncateText,
+  sanitizeLinkLabel,
+  createProgressBar,
+  createVolumeBar,
+  createStatusEmbed,
+  createPlayerEmbed,
+  createAddedSongEmbed,
+  createAddedListEmbed
+} = require('./src/embedHelper');
 
 // Prefixo padrão dos comandos de texto
 const PREFIX = '!';
-
-// Cores oficiais dos embeds
-const EMBED_COLOR = 0x00D8E6; // Cyan Neon
-const GOLD_COLOR = 0xFFD700;  // Dourado VIP
-
-const FOOTER_TEXT = '© 2026 Chlorine Music™ • Desenvolvido por .nolasco7';
-const DEFAULT_SUPPORT_URL = 'https://discord.gg/6MFj275a3S';
 
 // Definição dos Slash Commands registrados globalmente (apenas /play, /vip e /help)
 const slashCommands = [
@@ -62,23 +71,50 @@ function resolveAsset(assetsDir, candidates) {
  * Cria o módulo completo de comandos, embeds, travas VIP, controle de call e botões do bot.
  * @param {object} deps Dependências injetadas do núcleo do bot
  */
-function createCommandsModule({ client, distube, vipManager, voiceSession, rootDir = __dirname }) {
+function createCommandsModule({
+  client,
+  distube,
+  vipManager,
+  voiceSession,
+  playerEmojis = null,
+  rootDir = __dirname,
+  clearBatchDelayMs = 850,
+  clearAutoDeleteMs = 5000
+}) {
   if (!client || !distube || !vipManager || !voiceSession) {
     throw new Error('createCommandsModule requer client, distube, vipManager e voiceSession.');
   }
 
+  const MAX_CLEAR_MESSAGES = 500;
+  const BULK_DELETE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000 - 60 * 1000;
   const assetsDir = path.join(rootDir, 'assets');
+  const emojiManager = playerEmojis || createPlayerEmojiManager({ rootDir });
 
   // Controle de aviso único para usuários que tentam comandos bloqueados sem VIP
   // Notifica o usuário APENAS UMA VEZ sobre comprar VIP; tentativas posteriores não repetem o anúncio
   const warnedNonVipUsers = new Set();
 
+  // Trava por canal para impedir comandos simultâneos enquanto !clear estiver executando
+  const activeClearChannels = new Set();
+
+  function getBotAvatarUrl() {
+    return client.user?.displayAvatarURL?.() || null;
+  }
+
+  function statusEmbed(opts) {
+    return createStatusEmbed({
+      botAvatarUrl: getBotAvatarUrl(),
+      ...opts
+    });
+  }
+
   function createVipLockedEmbed(description) {
-    return new EmbedBuilder()
-      .setColor(GOLD_COLOR)
-      .setTitle('🔒 Comando Exclusivo VIP!')
-      .setDescription(description)
-      .setFooter({ text: FOOTER_TEXT });
+    return statusEmbed({
+      type: 'vip',
+      title: '🔒 Comando Exclusivo VIP!',
+      description,
+      footerText: FOOTER_TEXT
+    });
   }
 
   function notifyNonVipOnce(userId, replyFn, description) {
@@ -87,8 +123,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     }
     warnedNonVipUsers.add(userId);
     const defaultDescription =
-      'Os comandos **!skip**, **!pause**, **!resume**, **!queue**, **!volume** e **!autoplay** são exclusivos para servidores com plano **Chlorine VIP**!\n\n' +
-      'Digite **!vip** ou use **/vip** para conhecer os planos e liberar para o seu servidor!';
+      'Os comandos **!skip**, **!pause**, **!resume**, **!queue**, **!volume** e **!autoplay** são exclusivos para servidores **Chlorine VIP**!\n\n' +
+      'Use **`/vip`** ou **`!vip`** para conhecer os planos e liberar no seu servidor.';
     replyFn({ embeds: [createVipLockedEmbed(description || defaultDescription)] });
     return true;
   }
@@ -104,19 +140,46 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       new ButtonBuilder()
         .setCustomId(`music_pause:${hostTag}`)
         .setLabel(isPaused ? 'Despausar' : 'Pausar')
-        .setEmoji(isPaused ? '▶️' : '⏸️')
+        .setEmoji(emojiManager.getEmoji(isPaused ? 'play' : 'pause'))
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId(`music_skip:${hostTag}`)
         .setLabel('Pular')
-        .setEmoji('⏭️')
-        .setStyle(ButtonStyle.Primary),
+        .setEmoji(emojiManager.getEmoji('skip'))
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId(`music_stop:${hostTag}`)
         .setLabel('Parar')
-        .setEmoji('⏹️')
-        .setStyle(ButtonStyle.Danger)
+        .setEmoji(emojiManager.getEmoji('stop'))
+        .setStyle(ButtonStyle.Secondary)
     );
+  }
+
+  /**
+   * Monta o card de Player ("Tocando Agora") para uso compartilhado entre o evento playSong e !nowplaying.
+   */
+  function buildPlayerCardPayload(guildId, queue, { isSkipped = false, showLiveProgress = false } = {}) {
+    const isVip = vipManager.isGuildVip(guildId);
+    const song = queue.songs[0];
+    const voiceChannelName =
+      queue.voiceChannel?.name || distube.voices.get(guildId)?.channel?.name || null;
+    const controllerId = voiceSession.resolveCallHostId(guildId, song?.user?.id);
+
+    const embed = createPlayerEmbed({
+      queue,
+      song,
+      isVip,
+      isSkipped,
+      botUserId: client.user?.id || null,
+      botAvatarUrl: getBotAvatarUrl(),
+      callHostId: controllerId,
+      voiceChannelName,
+      showLiveProgress,
+      formatEmoji: formatPlayerEmoji
+    });
+
+    const row = createMusicRow(controllerId, Boolean(queue.paused));
+    return { embeds: [embed], components: [row] };
   }
 
   /**
@@ -127,6 +190,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const vipInfo = vipManager.getGuildVipInfo(guildId);
     const iconAsset = resolveAsset(assetsDir, ['iconepremium.png', 'chlorine_gold.webp']);
     const files = iconAsset.attachment ? [iconAsset.attachment] : [];
+    const botAvatarUrl = getBotAvatarUrl();
+    const authorIcon = botAvatarUrl || iconAsset.url || undefined;
 
     const supportUrl = process.env.SUPPORT_SERVER_URL || DEFAULT_SUPPORT_URL;
     const row = new ActionRowBuilder().addComponents(
@@ -134,153 +199,172 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         .setLabel('Entrar no Servidor Oficial')
         .setStyle(ButtonStyle.Link)
         .setURL(supportUrl)
-        .setEmoji('👑')
+        .setEmoji(emojiManager.getEmoji('vip'))
     );
 
+    const autoplayEmoji = formatPlayerEmoji('autoplay');
+    const volumeEmoji = formatPlayerEmoji('volume');
+    const queueEmoji = formatPlayerEmoji('queue');
+    const pauseEmoji = formatPlayerEmoji('pause');
+    const skipEmoji = formatPlayerEmoji('skip');
+    const vipEmoji = formatPlayerEmoji('vip');
+
     if (isVip && vipInfo) {
-      const embed = new EmbedBuilder()
-        .setColor(GOLD_COLOR)
-        .setTitle('👑 Chlorine Music™ VIP • Status do Servidor')
-        .setDescription(
-          `🎉 Parabéns! O servidor **${guildName}** possui o plano **Chlorine VIP Ativo**!\n` +
-          'Aproveite recursos de áudio ilimitados e qualidade de som máxima sem nenhuma restrição.'
-        )
-        .addFields(
+      const embed = statusEmbed({
+        type: 'vip',
+        title: '👑 Chlorine Music™ VIP • Status do Servidor',
+        description:
+          `✨ Parabéns! **${guildName}** possui acesso **Chlorine VIP Ativo**.\n` +
+          '> Todos os membros da call aproveitam recursos desbloqueados com áudio HD prioritário!',
+        thumbnail: iconAsset.url || authorIcon,
+        fields: [
           { name: '🏷️ Plano Contratado', value: `> **${vipInfo.planName}**`, inline: true },
-          { name: '⏱️ Tempo Restante', value: `> **${vipInfo.formattedRemaining}**`, inline: true },
-          { name: '📅 Válido Até', value: `> **${vipInfo.formattedExpiresAt}**`, inline: true },
+          { name: '⏱️ Tempo Restante', value: `> \`${vipInfo.formattedRemaining}\``, inline: true },
+          { name: '📅 Válido Até', value: `> \`${vipInfo.formattedExpiresAt}\``, inline: true },
           {
-            name: '✨ Recursos Desbloqueados',
+            name: '✨ Vantagens Desbloqueadas no Servidor',
             value: [
-              '> 📻 **Autoplay Automático:** Músicas recomendadas sem parar!',
-              '> 🔊 **Volume Avançado:** Ajuste o volume até 200% com áudio HD!',
-              '> ⏭️ **Skip Liberado:** Pule faixas instantaneamente!',
-              '> 📜 **Fila Interativa (!queue):** Veja a fila e pule para qualquer faixa!',
-              '> ⏸️ **Pause & Resume:** Pause e retome músicas quando quiser!',
-              '> ⚡ **Prioridade de Conexão:** Menor latência e sem quedas de buffer.',
-              '> 👑 **Embed Dourado Exclusivo:** Destaque no player do servidor.'
+              `> ${autoplayEmoji} **Autoplay Infinito** — Músicas recomendadas sem parar`,
+              `> ${volumeEmoji} **Volume HD (1%–200%)** — Ajuste amplificado com nitidez`,
+              `> ${queueEmoji} **Fila Interativa (!queue)** — Menu e salto direto para qualquer faixa`,
+              `> ${pauseEmoji} **Pause & Resume** — Pause e retome via comando ou botão`,
+              `> ${skipEmoji} **Skip Liberado** — Pule faixas sem espera para quem comanda a call`,
+              `> ${vipEmoji} **Visual Dourado VIP** — Cards e destaques exclusivos no servidor`
             ].join('\n'),
             inline: false
           }
-        )
-        .setFooter({
-          text: FOOTER_TEXT,
-          iconURL: iconAsset.url || undefined
-        });
-
-      if (iconAsset.url) {
-        embed.setThumbnail(iconAsset.url);
-      }
+        ],
+        footerText: FOOTER_TEXT
+      });
+      embed.setFooter({ text: FOOTER_TEXT, iconURL: iconAsset.url || botAvatarUrl || undefined });
       return { embeds: [embed], files, components: [row] };
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(GOLD_COLOR)
-      .setTitle('👑 Chlorine Music™ VIP • Eleve sua Experiência Sonora')
-      .setDescription(
-        `O servidor **${guildName}** ainda não possui um plano **Chlorine VIP**.\n` +
-        'Desbloqueie recursos de ponta, reprodução contínua e qualidade sonora de alta fidelidade para todos os membros!'
-      )
-      .addFields(
+    const embed = statusEmbed({
+      type: 'vip',
+      title: '👑 Chlorine Music™ VIP • Eleve sua Experiência Sonora',
+      description:
+        `O servidor **${guildName}** ainda está no plano gratuito.\n` +
+        '> Desbloqueie controle total da fila, volume amplificado até `200%`, Autoplay contínuo e prioridade de áudio HD!',
+      thumbnail: iconAsset.url || authorIcon,
+      fields: [
         {
-          name: '✨ Comandos & Vantagens Exclusivas VIP',
+          name: '✨ Recursos Exclusivos Desbloqueados',
           value: [
-            '> 📻 **!autoplay / !ap** • Músicas automáticas infinitas recomendadas!',
-            '> 🔊 **!volume / !vol** • Controle de volume amplificado HD de 1% a 200%!',
-            '> ⏭️ **!skip / !s** • Pule músicas sem votação ou restrições!',
-            '> 📜 **!queue / !q [nº]** • Veja a fila e pule direto para qualquer música!',
-            '> ⏸️ **!pause & !resume** • Pause e retome músicas quando quiser!',
-            '> ⚡ **Buffer Prioritário** • Áudio sem travamentos ou lentidão!',
-            '> 👑 **Suporte VIP Exclusivo** • Atendimento prioritário no servidor oficial.'
+            `> ${autoplayEmoji} **!autoplay / !ap** — Recomendações automáticas sem fim`,
+            `> ${volumeEmoji} **!volume <1-200>** — Volume HD amplificado até \`200%\``,
+            `> ${queueEmoji} **!queue [nº]** — Fila completa com menu e salto instantâneo`,
+            `> ${pauseEmoji} **!pause & !resume** — Controle total de pausa e retomada`,
+            `> ${skipEmoji} **!skip / !s** — Pule faixas instantaneamente na call`,
+            `> ${vipEmoji} **Prioridade de Áudio** — Menor latência e embeds dourados VIP`
           ].join('\n'),
           inline: false
         },
         {
-          name: '💎 Planos Disponíveis & Valores',
+          name: '💎 Planos Disponíveis',
           value: [
-            '> 🥉 **Plano Bronze (7 Dias):** `R$ 4,90`',
-            '> 🥈 **Plano Prata (15 Dias):** `R$ 8,90`',
-            '> 🥇 **Plano Ouro (30 Dias / Mensal):** `R$ 14,90` *(Mais Popular ⭐)*',
-            '> 💎 **Plano Platina (90 Dias / Trimestral):** `R$ 34,90`',
-            '> 👑 **Plano Supremo (1 Ano / Anual):** `R$ 79,90` *(Melhor Custo-Benefício 🚀)*'
+            '> 🥉 **Bronze (7 Dias):** `R$ 4,90`',
+            '> 🥈 **Prata (15 Dias):** `R$ 8,90`',
+            '> 🥇 **Ouro (30 Dias):** `R$ 14,90` • ⭐ *Mais Popular*',
+            '> 💎 **Platina (90 Dias):** `R$ 34,90`',
+            '> 👑 **Supremo (1 Ano):** `R$ 79,90` • 🚀 *Melhor Custo-Benefício*'
           ].join('\n'),
           inline: false
         },
         {
-          name: '🛒 Como Contratar o seu VIP',
-          value: (
-            `Para adquirir o seu VIP, entre no nosso servidor oficial: **[discord.gg/6MFj275a3S](${supportUrl})**!\n` +
-            'A ativação no seu servidor é imediata pela equipe oficial após a confirmação!'
-          ),
+          name: '🛒 Como Ativar no Seu Servidor',
+          value:
+            `> Entre no servidor oficial: **[discord.gg/6MFj275a3S](${supportUrl})**\n` +
+            '> A ativação no servidor escolhido é imediata após a confirmação!',
           inline: false
         }
-      )
-      .setFooter({
-        text: FOOTER_TEXT,
-        iconURL: iconAsset.url || undefined
-      });
-
-    if (iconAsset.url) {
-      embed.setThumbnail(iconAsset.url);
-    }
+      ],
+      footerText: FOOTER_TEXT
+    });
+    embed.setFooter({ text: FOOTER_TEXT, iconURL: iconAsset.url || botAvatarUrl || undefined });
     return { embeds: [embed], files, components: [row] };
+  }
+
+  /**
+   * Formata o emoji personalizado do player para textos/embeds (<:nome:id>) com fallback Unicode.
+   */
+  function formatPlayerEmoji(key) {
+    if (typeof emojiManager.formatEmoji === 'function') {
+      return emojiManager.formatEmoji(key);
+    }
+    const emoji = emojiManager.getEmoji(key);
+    if (emoji && typeof emoji === 'object' && emoji.id && emoji.name) {
+      return `<:${emoji.name}:${emoji.id}>`;
+    }
+    return typeof emoji === 'string' ? emoji : '🎵';
   }
 
   /**
    * Monta o painel principal de ajuda (/help e !help).
    */
   function createHelpPayload() {
-    const logoAsset = resolveAsset(assetsDir, ['logo.png', 'logo.jpg']);
-    const files = logoAsset.attachment ? [logoAsset.attachment] : [];
-    const avatarUrl = client.user?.displayAvatarURL?.();
-    const iconUrl = logoAsset.url || avatarUrl || undefined;
+    const bannerAsset = resolveAsset(assetsDir, ['banner.png', 'banner.jpg']);
+    const files = bannerAsset.attachment ? [bannerAsset.attachment] : [];
 
-    const embed = new EmbedBuilder()
-      .setColor(EMBED_COLOR)
-      .setAuthor({
-        name: 'Chlorine Music™ • Central de Ajuda & Comandos',
-        iconURL: iconUrl
-      })
-      .setDescription('Prefixo no servidor: `!` ou use os comandos de barra `/`')
-      .addFields(
+    const playEmoji = formatPlayerEmoji('play');
+    const pauseEmoji = formatPlayerEmoji('pause');
+    const skipEmoji = formatPlayerEmoji('skip');
+    const stopEmoji = formatPlayerEmoji('stop');
+    const playingEmoji = formatPlayerEmoji('playing');
+    const headsetEmoji = formatPlayerEmoji('headset');
+    const noteEmoji = formatPlayerEmoji('note');
+    const vipEmoji = formatPlayerEmoji('vip');
+    const gemEmoji = formatPlayerEmoji('gem');
+    const boltEmoji = formatPlayerEmoji('bolt');
+    const helpEmoji = formatPlayerEmoji('help');
+    const queueEmoji = formatPlayerEmoji('queue');
+    const volumeEmoji = formatPlayerEmoji('volume');
+    const autoplayEmoji = formatPlayerEmoji('autoplay');
+
+    const embed = statusEmbed({
+      type: 'info',
+      authorName: 'CHLORINE MUSIC™ • CENTRAL DE COMANDOS',
+      title: 'Comandos & Controles',
+      description:
+        `${headsetEmoji} Streaming em alta definição pelo **YouTube** e **Spotify**.\n` +
+        '> Prefixo **`!`** no chat ou barra **`/`** • Quem puxa o bot para a call comanda o skip.',
+      fields: [
         {
-          name: '🚀 Comandos de Barra Principais (/)',
+          name: `${boltEmoji} Comandos Principais (/)`,
           value: [
-            '> ▶️ **/play <música>** • Tocar qualquer música ou link',
-            '> 👑 **/vip** • Ver vantagens, planos e status VIP',
-            '> ❓ **/help** • Exibir este painel de comandos e ajuda'
+            `> ${playEmoji} \`/play <música>\` — Tocar música ou playlist`,
+            `> ${vipEmoji} \`/vip\` — Status e planos **Chlorine VIP**`,
+            `> ${helpEmoji} \`/help\` — Exibir esta central de ajuda`
           ].join('\n'),
           inline: false
         },
         {
-          name: '🎵 Controles do Player (Livres)',
+          name: `${noteEmoji} Comandos Livres (!)`,
           value: [
-            '> ⏹️ **!stop** • Parar e limpar fila',
-            '> 🔍 **!nowplaying** • Música tocando agora'
+            `> ${playEmoji} \`!play\` \`!p\` — Tocar ou adicionar à fila`,
+            `> ${stopEmoji} \`!stop\` \`!leave\` — Parar e sair da call`,
+            `> ${playingEmoji} \`!nowplaying\` \`!np\` — Faixa atual e controles`,
+            `> ${gemEmoji} \`!vip\` \`!premium\` — Planos e status VIP`
           ].join('\n'),
-          inline: true
+          inline: false
         },
         {
-          name: '👑 Comandos Exclusivos VIP',
+          name: `${vipEmoji} Comandos Exclusivos VIP (!)`,
           value: [
-            '> 👑 **/vip** / **!vip** • Painel VIP',
-            '> 📜 **!queue [nº]** • Ver fila e pular para uma música',
-            '> ⏸️ **!pause** • Pausar música',
-            '> ⏯️ **!resume** • Continuar música',
-            '> ⏭️ **!skip** • Pular faixas sem restrição',
-            '> 🔊 **!volume <1-200>** • Volume HD amplificado',
-            '> 📻 **!autoplay** • Músicas recomendadas infinitas'
+            `> ${queueEmoji} \`!queue [nº]\` \`!q\` — Fila e salto por número`,
+            `> ${pauseEmoji} \`!pause\` • ${playEmoji} \`!resume\` — Pausar ou retomar`,
+            `> ${skipEmoji} \`!skip\` \`!s\` — Pular *(dono da call)*`,
+            `> ${volumeEmoji} \`!volume <1-200>\` \`!v\` — Volume HD amplificado`,
+            `> ${autoplayEmoji} \`!autoplay\` \`!ap\` — Músicas recomendadas sem fim`
           ].join('\n'),
-          inline: true
+          inline: false
         }
-      )
-      .setFooter({
-        text: FOOTER_TEXT,
-        iconURL: iconUrl
-      });
+      ],
+      footerText: 'Chlorine Music™ • Todos os comandos em um só lugar'
+    });
 
-    if (iconUrl) {
-      embed.setThumbnail(iconUrl);
+    if (bannerAsset.url) {
+      embed.setImage(bannerAsset.url);
     }
 
     return { embeds: [embed], files };
@@ -293,35 +377,29 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const bannerAsset = resolveAsset(assetsDir, ['banner.png', 'banner.jpg']);
     const logoAsset = resolveAsset(assetsDir, ['logo.png', 'logo.jpg']);
     const files = [bannerAsset.attachment, logoAsset.attachment].filter(Boolean);
-    const avatarUrl = client.user?.displayAvatarURL?.();
-    const iconUrl = logoAsset.url || avatarUrl || undefined;
+    const iconUrl = logoAsset.url || getBotAvatarUrl() || undefined;
+    const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`;
 
-    const embed = new EmbedBuilder()
-      .setColor(EMBED_COLOR)
-      .setAuthor({
-        name: 'Chlorine Music™',
-        iconURL: iconUrl
-      })
-      .setTitle('👋 Olá! Eu sou o Chlorine Music™')
-      .setDescription(
-        'Estou aqui para transformar sua experiência musical no Discord com áudio de alta fidelidade.\n\n' +
-        'Meu prefixo neste servidor é: `!`'
-      )
-      .addFields(
+    const embed = statusEmbed({
+      type: 'info',
+      title: '👋 Olá! Eu sou o Chlorine Music™',
+      description:
+        'Experiência musical em alta fidelidade para o seu servidor Discord.\n' +
+        'Use **`/play`** ou **`!play <música>`** em uma call, ou digite **`/help`**.',
+      thumbnail: iconUrl,
+      fields: [
         { name: '👑 Criador', value: '`.nolasco7`', inline: true },
         { name: '🌍 Servidores', value: `\`${client.guilds.cache.size}\``, inline: true },
-        { name: '📡 Streaming', value: '`SoundCloud\n& YouTube`', inline: true }
-      )
-      .setFooter({ text: FOOTER_TEXT });
+        { name: '📡 Streaming', value: '`YouTube & Spotify`', inline: true }
+      ],
+      footerText: FOOTER_TEXT
+    });
+    embed.setFooter({ text: FOOTER_TEXT, iconURL: iconUrl });
 
-    if (iconUrl) {
-      embed.setThumbnail(iconUrl);
-    }
     if (bannerAsset.url) {
       embed.setImage(bannerAsset.url);
     }
 
-    const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`;
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel('Me adicione ao seu servidor')
@@ -337,24 +415,10 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
    * Monta o card "Tocando Agora" do comando /nowplaying e !nowplaying.
    */
   function createNowPlayingPayload(guildId, queue) {
-    const isVip = vipManager.isGuildVip(guildId);
-    const song = queue.songs[0];
-    const requesterInfo = voiceSession.formatSongRequesterInfo(queue, song);
-    const voiceChannelName =
-      queue.voiceChannel?.name || distube.voices.get(guildId)?.channel?.name || null;
-    const callInfo = voiceChannelName ? `\n🔊 **Call:** ${voiceChannelName}` : '';
-    const controllerId = voiceSession.resolveCallHostId(guildId, song.user?.id);
-    const embed = new EmbedBuilder()
-      .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
-      .setTitle(isVip ? '👑 Tocando Agora • VIP' : '🎵 Tocando Agora')
-      .setDescription(`**[${song.name}](${song.url})**\n\n**Duração:** \`${queue.formattedCurrentTime} / ${song.formattedDuration}\` • ${requesterInfo}${callInfo}`);
-
-    if (song.thumbnail) {
-      embed.setThumbnail(song.thumbnail);
-    }
-
-    const row = createMusicRow(controllerId, queue.paused);
-    return { embeds: [embed], components: [row] };
+    return buildPlayerCardPayload(guildId, queue, {
+      isSkipped: false,
+      showLiveProgress: true
+    });
   }
 
   /**
@@ -366,54 +430,60 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     if (!result.success) {
       return {
         embeds: [
-          new EmbedBuilder()
-            .setColor(GOLD_COLOR)
-            .setTitle('❌ Falha na Ativação')
-            .setDescription(result.message)
+          statusEmbed({
+            type: 'error',
+            authorName: 'CHLORINE VIP • ATIVAÇÃO',
+            title: '❌ Falha na Ativação VIP',
+            description: `> ${result.message}`,
+            footerText: FOOTER_TEXT
+          })
         ]
       };
     }
 
-    const goldAsset = resolveAsset(assetsDir, ['chlorine_gold.webp']);
+    const goldAsset = resolveAsset(assetsDir, ['iconepremium.png', 'chlorine_gold.webp']);
     const files = goldAsset.attachment ? [goldAsset.attachment] : [];
 
-    const embed = new EmbedBuilder()
-      .setColor(GOLD_COLOR)
-      .setTitle('🎉 VIP ATIVADO COM SUCESSO!')
-      .setDescription(`O servidor **${guildName}** agora é **Chlorine VIP**! 👑`)
-      .addFields(
+    const embed = statusEmbed({
+      type: 'vip',
+      authorName: 'CHLORINE VIP • ASSINATURA CONFIRMADA',
+      title: '🎉 VIP ATIVADO COM SUCESSO!',
+      description:
+        `✨ O servidor **${guildName}** acaba de receber o selo **Chlorine VIP**! 👑\n` +
+        '> Todos os comandos e recursos premium já estão desbloqueados.',
+      thumbnail: goldAsset.url || getBotAvatarUrl(),
+      fields: [
         { name: '💎 Plano Ativado', value: `> **${result.guildVip.planName}**`, inline: true },
         { name: '⏱️ Duração', value: `> **${result.guildVip.durationDays} dias**`, inline: true },
-        { name: '📅 Vencimento', value: `> **${result.guildVip.formattedExpiresAt}**`, inline: true },
+        { name: '📅 Vencimento', value: `> \`${result.guildVip.formattedExpiresAt}\``, inline: true },
         {
-          name: '🔓 Comandos Liberados Imediatamente',
+          name: '🔓 Recursos Liberados Imediatamente',
           value: [
-            `> 📻 **${commandPrefixLabel}autoplay** • Músicas automáticas infinitas!`,
-            `> 🔊 **${commandPrefixLabel}volume <1-200>** • Controle de volume amplificado HD!`,
-            `> ⏭️ **${commandPrefixLabel}skip** • Pule músicas sem restrição!`,
-            `> 📜 **${commandPrefixLabel}queue [nº]** • Veja a fila e pule para qualquer música!`,
-            `> ⏸️ **${commandPrefixLabel}pause & ${commandPrefixLabel}resume** • Pause e retome quando quiser!`
+            `> 📻 **${commandPrefixLabel}autoplay** — Músicas recomendadas sem parar`,
+            `> 🔊 **${commandPrefixLabel}volume <1-200>** — Volume amplificado HD até 200%`,
+            `> ⏭️ **${commandPrefixLabel}skip** — Pule faixas sem restrições`,
+            `> 📜 **${commandPrefixLabel}queue [nº]** — Fila completa com salto direto`,
+            `> ⏸️ **${commandPrefixLabel}pause & ${commandPrefixLabel}resume** — Controle de pausa liberado`
           ].join('\n'),
           inline: false
         }
-      )
-      .setFooter({
-        text: `Código ${code} resgatado por ${userTag}`,
-        iconURL: goldAsset.url || undefined
-      });
-
-    if (goldAsset.url) {
-      embed.setThumbnail(goldAsset.url);
-    }
+      ],
+      footerText: `Chave ${code} resgatada por ${userTag}`
+    });
+    embed.setFooter({
+      text: `Chave ${code} resgatada por ${userTag}`,
+      iconURL: goldAsset.url || getBotAvatarUrl() || undefined
+    });
 
     return { embeds: [embed], files };
   }
 
   async function playInVoiceChannel(guild, member, voiceChannel, query, extraOptions = {}) {
+    const normalizedQuery = normalizePlayQuery(query);
     return voiceSession.playWithSummonerTracking(
       guild,
       member,
-      () => distube.play(voiceChannel, query, { member, ...extraOptions }),
+      () => distube.play(voiceChannel, normalizedQuery, { member, ...extraOptions }),
       (guildId) => Boolean(distube.getQueue(guildId) || distube.voices.get(guildId))
     );
   }
@@ -423,7 +493,10 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       isVip: vipManager.isGuildVip(guildId),
       embedColor: EMBED_COLOR,
       goldColor: GOLD_COLOR,
-      notice
+      notice,
+      botAvatarUrl: getBotAvatarUrl(),
+      formatEmoji: formatPlayerEmoji,
+      getEmoji: (key) => emojiManager.getEmoji(key)
     });
   }
 
@@ -440,25 +513,36 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
   async function handleNumericQueueJump(queue, guildId, userId, numStr, replyFn) {
     if (!/^\d+$/.test(numStr)) {
-      const embed = new EmbedBuilder()
-        .setColor(EMBED_COLOR)
-        .setDescription('❌ Informe um número válido da fila! Exemplo: `!queue 3`');
-      return replyFn({ embeds: [embed] });
+      return replyFn({
+        embeds: [
+          statusEmbed({
+            type: 'error',
+            description: '❌ Informe um número válido da fila! Exemplo: `!queue 3`'
+          })
+        ]
+      });
     }
 
     const requestedNumber = parseInt(numStr, 10);
     const jumpResult = await executeQueueJump(queue, guildId, userId, requestedNumber);
     if (!jumpResult.ok) {
-      const embed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(jumpResult.message);
-      return replyFn({ embeds: [embed] });
+      return replyFn({
+        embeds: [
+          statusEmbed({
+            type: 'error',
+            description: jumpResult.message
+          })
+        ]
+      });
     }
 
-    const confirmEmbed = new EmbedBuilder()
-      .setColor(vipManager.isGuildVip(guildId) ? GOLD_COLOR : EMBED_COLOR)
-      .setDescription(
-        `⏭️ Pulando para **#${jumpResult.targetIndex} • ${jumpResult.targetSong.name}**!\n` +
-        `🗑️ **${jumpResult.skippedCount}** música(s) pulada(s) foram excluída(s) da fila.`
-      );
+    const isVip = vipManager.isGuildVip(guildId);
+    const confirmEmbed = statusEmbed({
+      type: isVip ? 'vip' : 'info',
+      description:
+        `${formatPlayerEmoji('skip')} Pulando para **#${jumpResult.targetIndex} • ${jumpResult.targetSong.name}**!\n` +
+        `${formatPlayerEmoji('queue')} **${jumpResult.skippedCount}** música(s) pulada(s) foram removida(s) da fila.`
+    });
     return replyFn({ embeds: [confirmEmbed] });
   }
 
@@ -504,10 +588,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       return;
     }
 
+    const ephemeralFlag = isSlash ? { ephemeral: true } : {};
+
     if (!queue) {
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma música está tocando no momento!')],
-        ...(isSlash ? { ephemeral: true } : {})
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
+        ...ephemeralFlag
       });
     }
 
@@ -515,10 +601,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const skipDenial = voiceSession.getSkipDenialMessage(guildId, userId, queue);
     if (skipDenial) {
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(skipDenial)],
-        ...(isSlash ? { ephemeral: true } : {})
+        embeds: [statusEmbed({ type: 'error', description: skipDenial })],
+        ...ephemeralFlag
       });
     }
+
+    const skippedSong = queue.songs?.[0];
 
     try {
       if (queue.songs.length <= 1 && !queue.autoplay) {
@@ -526,16 +614,17 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         distube.voices.leave(leaveTarget);
         voiceSession.clearVoiceSummoner(guildId);
         return replyFn({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ Fim da fila. A reprodução foi encerrada.')],
-          ...(isSlash ? { ephemeral: true } : {})
+          embeds: [statusEmbed({ type: 'info', description: `${formatPlayerEmoji('stop')} Fim da fila. A reprodução foi encerrada.` })],
+          ...ephemeralFlag
         });
       }
 
       queue._isSkipped = true;
       await queue.skip();
       if (isSlash) {
+        const songLabel = skippedSong?.name ? `**${sanitizeLinkLabel(skippedSong.name, 70)}**` : 'a música atual';
         return replyFn({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏭️ **Música pulada com sucesso!**')],
+          embeds: [statusEmbed({ type: 'vip', description: `${formatPlayerEmoji('skip')} Faixa pulada: ${songLabel}` })],
           ephemeral: true
         });
       }
@@ -545,8 +634,8 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     } catch (err) {
       queue._isSkipped = false;
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`❌ Não foi possível pular: ${err.message || err}`)],
-        ...(isSlash ? { ephemeral: true } : {})
+        embeds: [statusEmbed({ type: 'error', description: `❌ Não foi possível pular: \`${truncateText(err.message || err, 180)}\`` })],
+        ...ephemeralFlag
       });
     }
   }
@@ -567,21 +656,25 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const ephemeralFlag = isSlash ? { ephemeral: true } : {};
     if (!queue) {
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma música está tocando no momento!')],
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
         ...ephemeralFlag
       });
     }
     if (queue.paused) {
       const cmdHint = isSlash ? '`/resume`' : '`!resume`';
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`⚠️ A música já está pausada! Use ${cmdHint} para continuar.`)],
+        embeds: [statusEmbed({ type: 'error', description: `⚠️ A música já está pausada! Use ${cmdHint} para continuar.` })],
         ...ephemeralFlag
       });
     }
     queue.pause();
-    const pausedText = isSlash ? '⏸️ **Música pausada.**' : '⏸️ **Música pausada.** Use `!resume` para continuar.';
+    const currentSong = queue.songs?.[0];
+    const songTitle = currentSong?.name ? `**${truncateText(currentSong.name, 65)}**\n` : '';
+    const resumeHint = isSlash
+      ? `Use \`/resume\` ou ${formatPlayerEmoji('play')} **Despausar** para continuar.`
+      : `Use \`!resume\` ou ${formatPlayerEmoji('play')} **Despausar** para continuar.`;
     return replyFn({
-      embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(pausedText)],
+      embeds: [statusEmbed({ type: 'vip', description: `${formatPlayerEmoji('pause')} **Reprodução pausada**\n${songTitle}${resumeHint}` })],
       ...ephemeralFlag
     });
   }
@@ -592,7 +685,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       userId,
       isSlash,
       slashDescription:
-        '▶️ O comando de **Retomar Músicas (/resume)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n' +
+        `${formatPlayerEmoji('play')} O comando de **Retomar Músicas (/resume)** faz parte dos comandos exclusivos **Chlorine VIP**!\n\n` +
         'Digite `/vip` ou `!vip` para conhecer os planos e liberar para o seu servidor!',
       slashRepeatText: '🔒 Comando de resume exclusivo para servidores VIP.',
       replyFn
@@ -602,20 +695,21 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const ephemeralFlag = isSlash ? { ephemeral: true } : {};
     if (!queue) {
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma música está tocando no momento!')],
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
         ...ephemeralFlag
       });
     }
     if (!queue.paused) {
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⚠️ A música já está tocando normalmente!')],
+        embeds: [statusEmbed({ type: 'error', description: '⚠️ A música já está tocando normalmente!' })],
         ...ephemeralFlag
       });
     }
     queue.resume();
-    const resumedText = isSlash ? '▶️ **Música despausada!**' : '▶️ **Música despausada!** Continuando a reprodução.';
+    const currentSong = queue.songs?.[0];
+    const songTitle = currentSong?.name ? `**${truncateText(currentSong.name, 65)}**` : 'Continuando a reprodução.';
     return replyFn({
-      embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription(resumedText)],
+      embeds: [statusEmbed({ type: 'vip', description: `${formatPlayerEmoji('play')} **Reprodução retomada**\n${songTitle}` })],
       ...ephemeralFlag
     });
   }
@@ -634,11 +728,9 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     if (!allowed) return;
 
     if (!queue) {
-      if (isSlash) {
-        return replyFn({ content: '❌ Nenhuma fila de músicas ativa no momento!', ephemeral: true });
-      }
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!')]
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma fila de músicas ativa no momento!' })],
+        ...(isSlash ? { ephemeral: true } : {})
       });
     }
 
@@ -659,7 +751,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     }
     warnedNonVipUsers.add(interaction.user.id);
     await interaction.reply({
-      content: `🔒 O comando de **${featureLabel}** é exclusivo para servidores com plano **Chlorine VIP**! Digite \`!vip\` ou \`/vip\` no chat para conhecer os planos e liberar.`,
+      embeds: [
+        createVipLockedEmbed(
+          `O recurso de **${featureLabel}** faz parte da assinatura **Chlorine VIP**!\n` +
+          'Digite `!vip` ou `/vip` para conhecer os planos e liberar para todo o servidor.'
+        )
+      ],
       ephemeral: true
     });
     return false;
@@ -678,25 +775,24 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     });
     if (!allowed) return;
 
+    const ephemeralFlag = isSlash ? { ephemeral: true } : {};
+
     if (!queue) {
-      if (isSlash) {
-        return replyFn({ content: '❌ Nenhuma música está tocando no momento!', ephemeral: true });
-      }
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(GOLD_COLOR).setDescription('❌ Nenhuma música está tocando no momento!')]
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
+        ...ephemeralFlag
       });
     }
 
     const autoplay = queue.toggleAutoplay();
-    const embed = new EmbedBuilder()
-      .setColor(GOLD_COLOR)
-      .setTitle(`📻 Autoplay ${autoplay ? 'Ativado' : 'Desativado'} (VIP 👑)`)
-      .setDescription(
-        autoplay
-          ? '✅ O bot continuará buscando e tocando músicas recomendadas automaticamente baseadas na música atual!'
-          : '⏹️ O autoplay foi desligado. O bot irá parar quando a fila de músicas terminar.'
-      );
-    return replyFn({ embeds: [embed] });
+    const embed = statusEmbed({
+      type: 'vip',
+      title: `Autoplay ${autoplay ? 'Ativado' : 'Desativado'} • VIP 👑`,
+      description: autoplay
+        ? `${formatPlayerEmoji('autoplay')} O bot continuará tocando músicas recomendadas automaticamente ao fim da fila!`
+        : `${formatPlayerEmoji('stop')} O autoplay foi desligado. O bot irá parar quando a fila terminar.`
+    });
+    return replyFn({ embeds: [embed], ...ephemeralFlag });
   }
 
   function handleVolumeAction({ guildId, userId, queue, volume, isSlash, replyFn }) {
@@ -705,7 +801,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       userId,
       isSlash,
       slashDescription:
-        '🔊 O controle de **Volume Personalizado** (1% a 200%) é um recurso exclusivo para servidores **Chlorine VIP**!\n\n' +
+        `${formatPlayerEmoji('volume')} O controle de **Volume Personalizado** (1% a 200%) é um recurso exclusivo para servidores **Chlorine VIP**!\n\n` +
         'Digite `/vip` ou `!vip` para liberar o volume para o seu servidor!',
       slashRepeatText: '🔒 Controle de volume exclusivo para servidores VIP.',
       replyFn
@@ -715,28 +811,60 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const ephemeralFlag = isSlash ? { ephemeral: true } : {};
     if (!queue) {
       return replyFn({
-        embeds: [new EmbedBuilder().setColor(GOLD_COLOR).setDescription('❌ Nenhuma música está tocando no momento!')],
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
         ...ephemeralFlag
       });
     }
 
     if (Number.isNaN(volume) || volume < 1 || volume > 200) {
-      const embed = new EmbedBuilder()
-        .setColor(GOLD_COLOR)
-        .setTitle('🔊 Ajuste de Volume (VIP 👑)')
-        .setDescription(
-          `O volume atual é **${queue.volume}%**.\n\n` +
-          'Para alterar, digite um valor entre **1** e **200**.\n' +
-          '> Exemplo: `!volume 120` *(ou `!vol 150` / `!v 80`)*'
-        );
+      const embed = statusEmbed({
+        type: 'vip',
+        title: 'Controle de Volume • VIP 👑',
+        description:
+          `${formatPlayerEmoji('volume')} ${createVolumeBar(queue.volume)}\n` +
+          'Escolha um valor entre **1** e **200** *(ex: `!volume 120`)*.'
+      });
       return replyFn({ embeds: [embed], ...ephemeralFlag });
     }
 
     queue.setVolume(volume);
-    return replyFn({
-      embeds: [new EmbedBuilder().setColor(GOLD_COLOR).setDescription(`🔊 Volume ajustado para **${volume}%** com sucesso! 👑`)],
-      ...ephemeralFlag
+    const embed = statusEmbed({
+      type: 'vip',
+      title: 'Volume Ajustado • VIP 👑',
+      description: `${formatPlayerEmoji('volume')} ${createVolumeBar(volume)}`
     });
+    return replyFn({ embeds: [embed], ...ephemeralFlag });
+  }
+
+  function createPlaySearchEmbed(query) {
+    return statusEmbed({
+      type: 'info',
+      description: `${formatPlayerEmoji('headset')} Buscando **"${truncateText(query, 95)}"**...`
+    });
+  }
+
+  /**
+   * Monta o card de despedida exibido quando alguém retira o bot da chamada de voz (!leave / !stop / /stop / Parar).
+   */
+  function createLeavePayload() {
+    const supportUrl = process.env.SUPPORT_SERVER_URL || DEFAULT_SUPPORT_URL;
+    const bannerAsset = resolveAsset(assetsDir, ['banner.png', 'banner.jpg']);
+    const files = bannerAsset.attachment ? [bannerAsset.attachment] : [];
+
+    const embed = statusEmbed({
+      type: 'info',
+      description:
+        'Obrigado por usar o nosso serviço!\n\n' +
+        `Entre no nosso [**servidor de suporte**](${supportUrl}) para obter informações sobre atualizações, problemas e para discussões sobre os recursos do bot!`
+    });
+
+    if (bannerAsset.url) {
+      embed.setImage(bannerAsset.url);
+    }
+
+    embed.setFooter({ text: 'Suas sugestões e opiniões são sempre consideradas!' });
+
+    return { embeds: [embed], files };
   }
 
   /**
@@ -745,17 +873,32 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
   async function handleSlashCommand(interaction) {
     const { commandName } = interaction;
 
+    if (interaction.channelId && activeClearChannels.has(interaction.channelId)) {
+      return interaction.reply({
+        embeds: [
+          statusEmbed({
+            type: 'error',
+            description: '⏳ Já existe uma limpeza de chat em andamento neste canal. Aguarde finalizar para usar outro comando!'
+          })
+        ],
+        ephemeral: true
+      });
+    }
+
     if (commandName === 'play') {
       const voiceChannel = interaction.member?.voice?.channel;
       if (!voiceChannel) {
         return interaction.reply({
-          content: '❌ Você precisa entrar em um canal de voz primeiro!',
+          embeds: [statusEmbed({ type: 'error', description: '❌ Você precisa entrar em um canal de voz primeiro!' })],
           ephemeral: true
         });
       }
 
-      const query = interaction.options.getString('musica');
-      await interaction.reply({ content: `🔍 Buscando **"${query}"**...`, ephemeral: true });
+      const query = normalizePlayQuery(interaction.options.getString('musica'));
+      await interaction.reply({
+        embeds: [createPlaySearchEmbed(query)],
+        ephemeral: true
+      });
 
       try {
         await playInVoiceChannel(interaction.guild, interaction.member, voiceChannel, query, {
@@ -763,7 +906,15 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         });
         setTimeout(() => interaction.deleteReply().catch(() => {}), 2000);
       } catch (err) {
-        interaction.editReply(`❌ Ocorreu um erro ao buscar a música: ${err.message || err}`).catch(() => {});
+        interaction.editReply({
+          content: '',
+          embeds: [
+            statusEmbed({
+              type: 'error',
+              description: `❌ Ocorreu um erro ao buscar a música: \`${truncateText(err.message || err, 180)}\``
+            })
+          ]
+        }).catch(() => {});
       }
       return;
     }
@@ -785,15 +936,20 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     if (commandName === 'stop') {
       const queue = distube.getQueue(interaction.guildId);
+      const targetChannel = queue?.textChannel || interaction.channel;
       if (queue) {
         await queue.stop().catch(() => {});
       }
       distube.voices.leave(interaction.guildId);
       voiceSession.clearVoiceSummoner(interaction.guildId);
-      return interaction.reply({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ **Música parada e saí da chamada de voz com sucesso!** 👋')],
-        ephemeral: true
-      });
+
+      if (targetChannel?.send) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => {});
+        await targetChannel.send(createLeavePayload()).catch(() => {});
+        await interaction.deleteReply().catch(() => {});
+        return;
+      }
+      return interaction.reply(createLeavePayload());
     }
 
     if (commandName === 'pause') {
@@ -839,7 +995,10 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     if (commandName === 'nowplaying') {
       const queue = distube.getQueue(interaction.guildId);
       if (!queue) {
-        return interaction.reply({ content: '❌ Nenhuma música está tocando no momento!', ephemeral: true });
+        return interaction.reply({
+          embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
+          ephemeral: true
+        });
       }
       return interaction.reply(createNowPlayingPayload(interaction.guildId, queue));
     }
@@ -861,10 +1020,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
     if (commandName === 'setvip') {
       if (!vipManager.isOwner(interaction.user.id)) {
-        const embed = new EmbedBuilder()
-          .setColor(GOLD_COLOR)
-          .setTitle('⛔ Acesso Restrito ao Desenvolvedor')
-          .setDescription(`Apenas o dono do bot (<@${vipManager.OWNER_ID}>) possui permissão para usar este comando e ativar planos VIP com código!`);
+        const embed = statusEmbed({
+          type: 'error',
+          authorName: 'CHLORINE VIP • SEGURANÇA',
+          title: '⛔ Acesso Restrito ao Desenvolvedor',
+          description: `Apenas o dono do bot (<@${vipManager.OWNER_ID}>) possui permissão para ativar chaves VIP manualmente.`
+        });
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -904,7 +1065,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       const queue = distube.getQueue(interaction.guildId);
       if (!queue) {
         return interaction.update({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!')],
+          embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma fila de músicas ativa no momento!' })],
           components: []
         }).catch(() => {});
       }
@@ -927,10 +1088,18 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         if (jumpResult.stale) {
           return interaction.update(renderQueuePayload(interaction.guildId, queue, jumpResult.message)).catch(() => {});
         }
-        return interaction.reply({ content: jumpResult.message, ephemeral: true });
+        return interaction.reply({
+          embeds: [
+            statusEmbed({
+              type: 'error',
+              description: jumpResult.message
+            })
+          ],
+          ephemeral: true
+        });
       }
 
-      const notice = `⏭️ Pulando para **${jumpResult.targetSong.name}** — **${jumpResult.skippedCount}** faixa(s) anterior(es) removida(s) da fila!`;
+      const notice = `${formatPlayerEmoji('skip')} Pulando para **${jumpResult.targetSong.name}** — **${jumpResult.skippedCount}** faixa(s) anterior(es) removida(s) da fila!`;
       return interaction.update(renderQueuePayload(interaction.guildId, queue, notice)).catch(() => {});
     }
 
@@ -940,7 +1109,12 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     if (interaction.customId === 'vip_contact_info') {
       const supportUrl = process.env.SUPPORT_SERVER_URL || DEFAULT_SUPPORT_URL;
       return interaction.reply({
-        content: `👑 Para contratar o seu plano VIP, entre no servidor oficial da Chlorine: **${supportUrl}**!`,
+        embeds: [
+          statusEmbed({
+            type: 'vip',
+            description: `👑 Para contratar o seu plano VIP, entre no servidor oficial: **[discord.gg/6MFj275a3S](${supportUrl})**`
+          })
+        ],
         ephemeral: true
       });
     }
@@ -951,7 +1125,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const queue = distube.getQueue(interaction.guildId);
     if (!queue) {
       return interaction.reply({
-        content: '❌ Nenhuma música está tocando no momento!',
+        embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })],
         ephemeral: true
       });
     }
@@ -981,13 +1155,15 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       const controllerId = activeHostId || buttonHostId;
       if (queue.paused) {
         queue.resume();
-        const row = createMusicRow(controllerId, false);
-        await interaction.update({ components: [row] }).catch(() => {});
       } else {
         queue.pause();
-        const row = createMusicRow(controllerId, true);
-        await interaction.update({ components: [row] }).catch(() => {});
       }
+      const updatedCard = buildPlayerCardPayload(interaction.guildId, queue, {
+        isSkipped: false,
+        showLiveProgress: true
+      });
+      updatedCard.components = [createMusicRow(controllerId, Boolean(queue.paused))];
+      await interaction.update(updatedCard).catch(() => {});
       return;
     }
 
@@ -1007,17 +1183,21 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         }
       } catch (err) {
         queue._isSkipped = false;
-        console.error('Erro ao pular via botão:', err);
+        console.error('[Botão Pular] Erro:', err?.message || err);
       }
       return;
     }
 
     // Parar
     if (rawAction === 'stop') {
+      const targetChannel = queue?.textChannel || interaction.channel;
       await interaction.deferUpdate().catch(() => {});
       await queue.stop().catch(() => {});
       distube.voices.leave(interaction.guildId);
       voiceSession.clearVoiceSummoner(interaction.guildId);
+      if (targetChannel?.send) {
+        await targetChannel.send(createLeavePayload()).catch(() => {});
+      }
     }
   }
 
@@ -1039,7 +1219,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       if (
         refMsg &&
         refMsg.author?.id === client.user?.id &&
-        refMsg.embeds?.[0]?.title?.startsWith('🎶 Fila de Reprodução')
+        refMsg.embeds?.[0]?.title?.includes('Fila de Reprodução')
       ) {
         if (!handleVipFeatureGate({ guildId: message.guild.id, userId: message.author.id, isSlash: false, replyFn: (payload) => message.reply(payload) })) {
           return;
@@ -1047,7 +1227,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         const queue = distube.getQueue(message.guild.id);
         if (!queue) {
           return message.reply({
-            embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma fila de músicas ativa no momento!')]
+            embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma fila de músicas ativa no momento!' })]
           });
         }
         return handleNumericQueueJump(queue, message.guild.id, message.author.id, trimmedContent, (payload) =>
@@ -1065,28 +1245,200 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     const args = withoutPrefix.split(/ +/g);
     const command = args.shift().toLowerCase();
 
+    // Impede qualquer outro comando no canal enquanto uma limpeza !clear estiver em andamento
+    const channelId = message.channel?.id;
+    if (channelId && activeClearChannels.has(channelId)) {
+      const waitMsg = await message.reply({
+        embeds: [
+          statusEmbed({
+            type: 'error',
+            description: '⏳ Já existe uma limpeza de chat em andamento neste canal. Aguarde finalizar para usar outro comando!'
+          })
+        ]
+      }).catch(() => null);
+      if (clearAutoDeleteMs > 0) {
+        setTimeout(() => {
+          waitMsg?.delete?.().catch(() => {});
+          message.delete?.().catch(() => {});
+        }, Math.min(clearAutoDeleteMs, 4000)).unref?.();
+      }
+      return;
+    }
+
+    // COMANDO ADMIN: !clear <1-500> (ou !limpar)
+    if (command === 'clear' || command === 'limpar') {
+      const isAdmin = Boolean(
+        message.member?.permissions?.has?.(PermissionFlagsBits.Administrator) ||
+        (message.guild?.ownerId && message.guild.ownerId === message.author?.id)
+      );
+      if (!isAdmin) {
+        return message.reply({
+          embeds: [
+            statusEmbed({
+              type: 'error',
+              description: '⛔ Apenas administradores do servidor podem usar o comando `!clear`!'
+            })
+          ]
+        });
+      }
+
+      const botPerms = message.guild?.members?.me?.permissionsIn?.(message.channel);
+      if (botPerms && typeof botPerms.has === 'function') {
+        if (
+          !botPerms.has(PermissionFlagsBits.ManageMessages) ||
+          !botPerms.has(PermissionFlagsBits.ReadMessageHistory)
+        ) {
+          return message.reply({
+            embeds: [
+              statusEmbed({
+                type: 'error',
+                description: '❌ Preciso das permissões **Gerenciar Mensagens** e **Ver Histórico de Mensagens** neste canal!'
+              })
+            ]
+          });
+        }
+      }
+
+      const rawCount = (args[0] || '').trim();
+      const amount = /^\d+$/.test(rawCount) ? parseInt(rawCount, 10) : NaN;
+      if (!Number.isInteger(amount) || amount < 1 || amount > MAX_CLEAR_MESSAGES) {
+        return message.reply({
+          embeds: [
+            statusEmbed({
+              type: 'error',
+              description: `❌ Informe uma quantidade válida entre **1** e **${MAX_CLEAR_MESSAGES}** mensagens!\n> Exemplo: \`!clear 50\``
+            })
+          ]
+        });
+      }
+
+      if (!message.channel?.messages?.fetch || typeof message.channel?.bulkDelete !== 'function') {
+        return message.reply({
+          embeds: [statusEmbed({ type: 'error', description: '❌ Não foi possível limpar mensagens neste canal.' })]
+        });
+      }
+
+      if (channelId) {
+        activeClearChannels.add(channelId);
+      }
+
+      let deletedTotal = 0;
+      let skippedOldMessages = 0;
+
+      try {
+        let beforeId = message.id;
+        await message.delete?.().catch(() => {});
+
+        let remaining = amount;
+        while (remaining > 0) {
+          const toFetch = Math.min(remaining, 100);
+          const fetched = await message.channel.messages.fetch({
+            limit: toFetch,
+            ...(beforeId ? { before: beforeId } : {})
+          });
+
+          const batch = fetched ? Array.from(fetched.values()) : [];
+          if (batch.length === 0) break;
+
+          beforeId = batch[batch.length - 1]?.id || beforeId;
+          const now = Date.now();
+          const deletable = batch.filter(
+            (m) => !m.createdTimestamp || now - m.createdTimestamp < BULK_DELETE_MAX_AGE_MS
+          );
+          const oldInBatch = batch.length - deletable.length;
+          if (oldInBatch > 0) {
+            skippedOldMessages += oldInBatch;
+          }
+
+          if (deletable.length === 0) {
+            break;
+          }
+
+          const bulkResult = await message.channel.bulkDelete(deletable, true);
+          const batchDeleted =
+            bulkResult && typeof bulkResult.size === 'number' && bulkResult.size > 0
+              ? bulkResult.size
+              : deletable.length;
+
+          deletedTotal += batchDeleted;
+          remaining -= batchDeleted;
+
+          if (batch.length < toFetch || oldInBatch > 0) {
+            break;
+          }
+
+          if (remaining > 0 && clearBatchDelayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, clearBatchDelayMs));
+          }
+        }
+
+        const summaryEmbed =
+          deletedTotal > 0
+            ? statusEmbed({
+                type: 'info',
+                title: 'Chat Limpo',
+                description:
+                  `${formatPlayerEmoji('bolt')} **${deletedTotal}** mensagem(ns) removida(s) por ${message.author}.` +
+                  (skippedOldMessages > 0
+                    ? '\n> ⚠️ Mensagens com mais de **14 dias** não puderam ser apagadas (limite do Discord).'
+                    : '')
+              })
+            : statusEmbed({
+                type: skippedOldMessages > 0 ? 'error' : 'info',
+                description:
+                  skippedOldMessages > 0
+                    ? '⚠️ Nenhuma mensagem pôde ser apagada porque todas têm mais de **14 dias** (limite do Discord).'
+                    : '✨ Não havia mensagens anteriores para apagar neste canal.'
+              });
+
+        const confirmMsg = await message.channel.send({ embeds: [summaryEmbed] }).catch(() => null);
+        if (confirmMsg?.delete && clearAutoDeleteMs > 0) {
+          setTimeout(() => confirmMsg.delete().catch(() => {}), clearAutoDeleteMs).unref?.();
+        }
+      } catch (err) {
+        console.error('[!clear] Erro:', err?.message || err);
+        await message.channel
+          .send({
+            embeds: [
+              statusEmbed({
+                type: 'error',
+                description: `❌ Não foi possível concluir a limpeza do chat: \`${truncateText(err.message || err, 180)}\``
+              })
+            ]
+          })
+          .catch(() => {});
+      } finally {
+        if (channelId) {
+          activeClearChannels.delete(channelId);
+        }
+      }
+      return;
+    }
+
     // COMANDO: !play (ou !p)
     if (command === 'play' || command === 'p') {
       const voiceChannel = message.member?.voice?.channel;
       if (!voiceChannel) {
         return message.reply({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Você precisa entrar em um canal de voz primeiro!')]
+          embeds: [statusEmbed({ type: 'error', description: '❌ Você precisa entrar em um canal de voz primeiro!' })]
         });
       }
 
-      const query = args.join(' ');
+      const query = normalizePlayQuery(args.join(' '));
       if (!query) {
         return message.reply({
           embeds: [
-            new EmbedBuilder()
-              .setColor(EMBED_COLOR)
-              .setDescription('❌ Por favor, digite o nome ou o link da música!\nExemplo: `!play bohemian rhapsody`')
+            statusEmbed({
+              type: 'error',
+              description: '❌ Por favor, digite o nome ou o link da música!\nExemplo: `!play bohemian rhapsody`'
+            })
           ]
         });
       }
 
-      const searchEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`🔍 Buscando **"${query}"**...`);
-      const searchMsg = await message.channel.send({ embeds: [searchEmbed] });
+      const searchMsg = await message.channel.send({
+        embeds: [createPlaySearchEmbed(query)]
+      });
 
       try {
         await playInVoiceChannel(message.guild, message.member, voiceChannel, query, {
@@ -1095,9 +1447,15 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
         });
         setTimeout(() => searchMsg.delete().catch(() => {}), 2000);
       } catch (err) {
-        console.error('Erro ao tentar reproduzir:', err);
-        const errEmbed = new EmbedBuilder().setColor(EMBED_COLOR).setDescription(`❌ Ocorreu um erro ao buscar a música: ${err.message || err}`);
-        searchMsg.edit({ embeds: [errEmbed] });
+        console.error('[!play] Erro:', err?.message || err);
+        searchMsg.edit({
+          embeds: [
+            statusEmbed({
+              type: 'error',
+              description: `❌ Ocorreu um erro ao buscar a música: \`${truncateText(err.message || err, 180)}\``
+            })
+          ]
+        }).catch(() => {});
       }
       return;
     }
@@ -1122,18 +1480,17 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
       if (!queue && !voice) {
         return message.reply({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ O bot não está em nenhum canal de voz no momento!')]
+          embeds: [statusEmbed({ type: 'error', description: '❌ O bot não está em nenhum canal de voz no momento!' })]
         });
       }
 
+      const targetChannel = queue?.textChannel || message.channel;
       if (queue) {
         await queue.stop().catch(() => {});
       }
       distube.voices.leave(message);
       voiceSession.clearVoiceSummoner(message.guild.id);
-      return message.reply({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('⏹️ **Música parada e saí da chamada de voz com sucesso!** 👋')]
-      });
+      return targetChannel.send(createLeavePayload());
     }
 
     // COMANDO: !pause (ou !pausar)
@@ -1175,7 +1532,7 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
       const queue = distube.getQueue(message);
       if (!queue) {
         return message.reply({
-          embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setDescription('❌ Nenhuma música está tocando no momento!')]
+          embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })]
         });
       }
       return message.reply(createNowPlayingPayload(message.guild.id, queue));
@@ -1217,14 +1574,18 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
 
       const code = args[0];
       if (!code) {
-        const embed = new EmbedBuilder()
-          .setColor(GOLD_COLOR)
-          .setTitle('⚠️ Código VIP Não Informado')
-          .setDescription(
-            'Por favor, informe o código gerado no painel web do bot.\n\n' +
-            '**Exemplo de uso:**\n`!setvip CHLORINE-VIP-30D-XXXX-YYYY`'
-          );
-        return message.reply({ embeds: [embed] });
+        return message.reply({
+          embeds: [
+            statusEmbed({
+              type: 'vip',
+              authorName: 'CHLORINE VIP • ATIVAÇÃO',
+              title: '⚠️ Código VIP Não Informado',
+              description:
+                'Informe o código gerado no painel web do bot.\n\n' +
+                '> **Exemplo:** `!setvip CHLORINE-VIP-30D-XXXX-YYYY`'
+            })
+          ]
+        });
       }
 
       const payload = createSetVipActivationPayload({
@@ -1245,6 +1606,33 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
   }
 
   /**
+   * Monta os cards automáticos do DisTube (addSong / addList) usando o mesmo padrão visual.
+   */
+  function buildAddedSongEmbed(queue, song) {
+    return createAddedSongEmbed({
+      queue,
+      song,
+      isVip: vipManager.isGuildVip(queue.id),
+      botUserId: client.user?.id || null,
+      botAvatarUrl: getBotAvatarUrl(),
+      formatEmoji: formatPlayerEmoji
+    });
+  }
+
+  function buildAddedListEmbed(queue, playlist) {
+    const voiceChannelName =
+      queue.voiceChannel?.name || distube.voices.get(queue.id)?.channel?.name || null;
+    return createAddedListEmbed({
+      queue,
+      playlist,
+      isVip: vipManager.isGuildVip(queue.id),
+      voiceChannelName,
+      botAvatarUrl: getBotAvatarUrl(),
+      formatEmoji: formatPlayerEmoji
+    });
+  }
+
+  /**
    * Conecta os listeners de interações e mensagens ao client do Discord.
    */
   function registerCommandListeners() {
@@ -1258,9 +1646,17 @@ function createCommandsModule({ client, distube, vipManager, voiceSession, rootD
     GOLD_COLOR,
     slashCommands,
     warnedNonVipUsers,
+    activeClearChannels,
+    statusEmbed,
     createMusicRow,
+    buildPlayerCardPayload,
+    buildAddedSongEmbed,
+    buildAddedListEmbed,
     createVipEmbed,
     createHelpPayload,
+    createMentionPayload,
+    createLeavePayload,
+    createNowPlayingPayload,
     registerCommandListeners,
     handleInteraction,
     handleMessage

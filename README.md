@@ -1,23 +1,33 @@
 # 🎵 Chlorine Music™
 
-Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v14** e **DisTube v5**, com áudio de alta fidelidade (**Opus nativo**), sistema de planos **VIP** com embeds dourados, controle exclusivo de call para **quem puxou o bot** (inclusive no Autoplay) e **Painel de Controle Web Localhost**.
+Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v14** e **DisTube v5**, com reprodução avançada no **YouTube e Spotify**, identidade visual em **Roxo Neon & Dourado VIP**, botões do player com **Application Emojis personalizados**, controle exclusivo de call para **quem puxou o bot** e **Painel de Controle Web Localhost**.
 
 ---
 
 ## ✨ Funcionalidades Atuais
 
-- 🔍 **Reprodução Multi-Plataforma:** Busca inteligente por nome e suporte a links/playlists via `@distube/youtube`, `@distube/spotify`, `@distube/yt-dlp` (e suporte opcional a `cookies.txt` para o YouTube).
-- 🔊 **Áudio HD Estável & Call Visível:** Utiliza `@discordjs/opus` nativo (evitando engasgos e quedas prematuras em mixes longos), `ffmpeg-static` integrado, estabilizador de voz e exibição do canal de voz ativo (`🔊 Call`) no embed de *Tocando Agora*.
-- 👑 **Controle Exclusivo de Call (Skip, Fila & Autoplay):**
+- 🔍 **Reprodução Multi-Plataforma & Spotify Completo:**
+  - Busca por nome e suporte a vídeos, lives e playlists via `@distube/youtube` e `@distube/yt-dlp` *(com suporte opcional a `cookies.txt`)*.
+  - Integração aprimorada ao **Spotify** ([`src/spotifyPlugin.js`](src/spotifyPlugin.js)) com suporte à API oficial (`SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`), links regionais (`/intl-pt/`), URLs legadas (`/user/.../playlist/...`), URIs (`spotify:playlist:...`), links entre `<>` e links encurtados (`spotify.link`, `spoti.fi`, `spotify.app.link`), incluindo playlists de usuários, playlists editoriais, álbuns, artistas e faixas isoladas.
+- 🔊 **Áudio Estável & Call Visível:** Integração com `ffmpeg-static` e codecs Opus (`@discord-player/opus`, `@discordjs/opus` opcional e `opusscript`), estabilizador de rede no `voiceStateUpdate` e exibição do canal de voz ativo (`🔊`) no card de *Tocando Agora*.
+- 🎨 **Identidade Visual Padronizada:**
+  - **Roxo Neon (`#8018D8`):** Embeds padrão do bot, ajuda, despedida e cartões normais.
+  - **Dourado VIP (`#FFD700`):** Embeds exclusivos de servidores VIP e central `/vip` com ícone [`assets/iconepremium.png`](assets/iconepremium.png).
+  - **Vermelho Erro (`#EF4444`):** Mensagens de erro e alertas de falha.
+  - **Despedida Limpa (`!stop` / `!leave`):** Ao sair da call, envia diretamente no canal de comandos (sem mencionar o usuário) um embed roxo com agradecimento, link para o servidor de suporte e o banner [`assets/banner.png`](assets/banner.png).
+- 🎛️ **Botões Personalizados & Emojis Neon Roxos (16 Application Emojis):**
+  - Card de *Tocando Agora* com capa, duração, call conectada e 3 botões escuros com ícones neon roxos próprios do bot (**Pausar / Despausar**, **Pular** e **Parar**).
+  - Conjunto completo com **16 ícones PNG** em [`assets/emojis/`](assets/emojis) (`play`, `pause`, `skip`, `stop`, `playing`, `headset`, `note`, `vip`, `gem`, `bolt`, `help`, `queue`, `volume`, `autoplay`, `clock`, `user`), aplicados nos botões do player, no menu da fila e em embeds (`/help`, `/vip`, *Tocando Agora* e *Adicionado à Fila / Playlist*).
+  - Todos os ícones são sincronizados automaticamente como *Application Emojis* no aplicativo Discord em cada inicialização via [`src/playerEmojis.js`](src/playerEmojis.js) (com cache local em [`data/player_emojis.json`](data/player_emojis.json) e fallback Unicode automático).
+- 👑 **Controle Exclusivo de Call (Skip, Botões & Autoplay):**
   - Quem puxar o bot para o canal de voz primeiro (`/play` ou `!play`) torna-se o responsável pela chamada.
-  - Mesmo que outros membros adicionem faixas ou que o **Autoplay** esteja ativo tocando músicas recomendadas, **apenas quem puxou o bot para a call** pode pular faixas (`!skip`, botão `⏭️ Pular` ou salto numerado no `!queue`).
-- 🎮 **Player Interativo sem Poluição:** Card de *Tocando Agora* com capa, duração, call conectada e botões (`⏸️ Pausar / ▶️ Despausar`, `⏭️ Pular`, `⏹️ Parar`).
-- 🚀 **Slash Commands Enxutos (`/`) & Código Modular:** Apenas os 3 comandos principais registrados globalmente (`/play`, `/vip`, `/help`) para manter o perfil do bot limpo, com todos os comandos de chat (`!`), travas e botões centralizados em [`comandos.js`](comandos.js).
-- 💬 **Status Personalizado & Menção:** Status `!play ou /play | Música` e resposta automática com card e botão de convite ao mencionar `@Chlorine Music™`.
+  - Mesmo que outros membros adicionem faixas ou o **Autoplay** esteja ativo tocando músicas recomendadas, **apenas quem puxou o bot para a call** pode usar os botões do player ou pular faixas (`!skip` / salto no `!queue`).
+- 🚀 **Slash Commands Enxutos (`/`) & Código Modular:** Apenas os 3 comandos principais registrados globalmente (`/play`, `/vip`, `/help`) para manter o perfil do bot limpo, com todos os comandos de chat (`!`), travas e interações centralizados em [`comandos.js`](comandos.js).
+- 💬 **Status Personalizado & Menção:** Presença `!play ou /play | Música` e cartão de apresentação automático com banner e botão de convite ao mencionar `@Chlorine Music™`.
 - 💎 **Sistema Chlorine VIP:**
-  - Comandos `!queue`, `!pause`, `!resume`, `!skip`, `!volume` e `!autoplay` — além dos botões `⏸️ Pausar / ▶️ Despausar` e `⏭️ Pular`, menu interativo da fila e resposta numérica — exclusivos para servidores VIP.
-  - Planos disponíveis em `/vip` ou `!vip`, embeds dourados em servidores VIP e aviso único por usuário sem VIP quando tenta usar um recurso bloqueado (evitando spam no chat).
-- 🌐 **Painel Web Localhost do Dono (`http://localhost:3000`):** Interface responsiva com call conectada ao vivo, troca de canal de voz, controle completo do player e edição total da fila em tempo real, além de gestão de chaves e servidores VIP.
+  - Comandos `!queue`, `!pause`, `!resume`, `!skip`, `!volume` e `!autoplay` — além dos botões **Pausar / Despausar** e **Pular**, menu interativo da fila e resposta numérica — exclusivos para servidores VIP.
+  - Aviso único por usuário sem VIP ao tentar um recurso bloqueado (evitando spam no chat).
+- 🌐 **Painel Web Localhost do Dono (`http://localhost:3000`):** Interface responsiva com identidade [`/assets/iconepremium.png`](assets/iconepremium.png), exibição ao vivo da call conectada, troca de canal de voz, controle completo do player, normalização de links Spotify, edição total da fila em tempo real e gestão de chaves/servidores VIP.
 
 ---
 
@@ -27,33 +37,33 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 
 | Comando | Descrição |
 | :--- | :--- |
-| `/play <musica>` | Busca e toca uma música ou playlist no canal de voz atual |
+| `/play <musica>` | Busca e toca uma música, playlist ou link (YouTube, Spotify, etc.) na call atual |
 | `/vip` | Exibe o status e tempo restante do VIP do servidor ou os planos disponíveis |
-| `/help` | Mostra a central de comandos e ajuda |
+| `/help` | Mostra o painel resumido de comandos e ajuda |
 
 ### 🎵 Comandos de Chat (`!`) — Livres
 
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
-| `!play <nome ou link>` | `!p` | Toca uma música ou adiciona à fila |
-| `!stop` | `!parar`, `!leave`, `!sair` | Para a música, limpa a fila e desconecta da chamada |
-| `!nowplaying` | `!np`, `!tocando` | Exibe detalhes e controles da faixa atual |
-| `!vip` | `!premium` | Mostra os planos VIP ou status VIP do servidor |
-| `!help` | `!ajuda`, `!comandos`, `!h` | Exibe o painel de comandos |
-| `@Chlorine Music™` | *(menção)* | Mostra informações do bot e botão para adicioná-lo |
+| `!play <nome ou link>` | `!p` | Toca uma música, link ou playlist e adiciona à fila |
+| `!stop` | `!parar`, `!leave`, `!sair` | Para a reprodução, limpa a fila, sai da call e envia o card de despedida no canal de comandos |
+| `!nowplaying` | `!np`, `!tocando` | Exibe detalhes ao vivo, barra de progresso e controles da faixa atual |
+| `!vip` | `!premium` | Mostra os planos VIP ou o status VIP ativo do servidor |
+| `!help` | `!ajuda`, `!comandos`, `!h` | Exibe a central de comandos do bot |
+| `@Chlorine Music™` | *(menção)* | Mostra informações do bot, banner e botão para adicioná-lo |
 
 ### 👑 Comandos Exclusivos VIP (`!`)
 
 | Comando | Abreviações | Descrição |
 | :--- | :--- | :--- |
-| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada e permite pular direto para a faixa escolhida (por `!queue <nº>`, menu suspenso ou respondendo com o número no chat), removendo as faixas puladas |
+| `!queue [nº]` | `!q`, `!fila` | Lista a fila numerada e permite pular direto para a faixa escolhida (via `!queue <nº>`, menu suspenso ou respondendo com o número no chat), removendo as faixas puladas |
 | `!pause` | `!pausar` | Pausa a reprodução atual |
 | `!resume` | `!despausar`, `!continuar`, `!unpause` | Retoma a música pausada |
 | `!skip` | `!s`, `!pular`, `!next` | Pula a faixa atual *(exclusivo para quem puxou o bot para a call)* |
 | `!volume <1-200>` | `!vol`, `!v` | Ajusta o volume HD do player entre `1%` e `200%` |
 | `!autoplay` | `!ap`, `!auto` | Ativa/desativa a reprodução contínua de músicas recomendadas |
 
-> 🔒 **Regras de Bloqueio:** Os botões **`⏸️ Pausar / ▶️ Despausar`** e **`⏭️ Pular`** do player seguem as travas VIP (e de responsável pela call no caso de pular/saltar faixas). Usuários em servidores sem VIP recebem apenas **1 aviso** para evitar poluição no chat.
+> 🔒 **Regras de Bloqueio:** Os botões **Pausar / Despausar** e **Pular** do player seguem as travas VIP (e a trava do responsável pela call para pular faixas e acionar os botões). Usuários em servidores sem VIP recebem apenas **1 aviso** por sessão para evitar poluição no chat.
 
 ---
 
@@ -73,17 +83,17 @@ Bot completo de música para Discord desenvolvido em **Node.js**, **Discord.js v
 
 ## 🌐 Painel de Controle Web (Localhost)
 
-Ao iniciar o bot, o painel web do dono abre localmente com layout responsivo em:
+Ao iniciar o bot, o painel web do dono fica disponível localmente em:
 
-👉 **`http://localhost:3000`**
+👉 **`http://localhost:3000`** *(ou na porta definida em `PORT` no `.env`)*
 
 * **🎛️ Player & Voz ao Vivo (Owner):**
-  * Exibe em tempo real a call conectada (`🔊 Call: <nome>`) no cabeçalho do servidor e no card *Tocando Agora*.
+  * Exibe em tempo real a call conectada (`🔊`) no cabeçalho do servidor e no card *Tocando Agora*.
   * Permite trocar o bot de canal de voz ao vivo (`Mover Bot p/ Call`).
   * Barra de progresso clicável (seek), controles `Previous`, `Pause / Resume`, `Skip`, `Stop`, `Repeat` (desativado/faixa/fila), `Autoplay`, `Shuffle` e volume (`1%` a `200%`).
-  * Tocar músicas pelo painel escolhendo entre **`Adicionar à fila`**, **`Próxima (#1)`** ou **`Tocar imediatamente`**.
+  * Tocar músicas pelo painel (inclusive links do Spotify e YouTube) escolhendo entre **`Adicionar à fila`**, **`Próxima (#1)`** ou **`Tocar imediatamente`**.
 * **📜 Gestão Completa da Fila:** Reordene faixas arrastando e soltando ou pelos botões subir/descer, coloque como próxima (`#1`), pule direto para qualquer posição, remova itens individuais ou limpe a fila inteira.
-* **👑 Sistema VIP:** Gere chaves aleatórias por plano (7, 15, 30, 90 ou 365 dias), visualize chaves ativas/resgatadas e ative ou remova VIP de servidores diretamente.
+* **👑 Sistema VIP:** Gere chaves aleatórias por plano (`7d`, `15d`, `30d`, `90d` ou `365d`), visualize chaves ativas/resgatadas e ative ou remova VIP de servidores diretamente.
 * **🌍 Servidores:** Monitore servidores conectados, fila ativa, call atual e ping do bot em tempo real.
 
 ---
@@ -92,20 +102,28 @@ Ao iniciar o bot, o painel web do dono abre localmente com layout responsivo em:
 
 ```text
 discord-music-bot/
-├── index.js                    # Núcleo do bot Discord, painéis, DisTube e conexão de voz
-├── comandos.js                 # Todos os comandos (! /), botões, trava VIP e menu da fila
+├── index.js                      # Núcleo do bot Discord, painéis, DisTube, presença e conexão de voz
+├── comandos.js                   # Comandos (! /), menções, travas VIP/canal, moderação e botões
 ├── src/
-│   ├── dashboardServer.js      # Servidor Express e API do painel web (localhost:3000)
-│   ├── queueHelper.js          # Menu interativo numerado da fila e salto direto (!queue)
-│   ├── vipManager.js           # Persistência e gestão de planos/chaves VIP
-│   └── voiceSessionManager.js  # Controle do responsável da call e permissão de skip/autoplay
-├── public/                     # Interface web (HTML, CSS e JS) do painel localhost
-├── assets/                     # Imagens e ícones dos embeds e do painel
-├── data/                       # Banco JSON local do sistema VIP (vip_database.json)
-├── iniciar.bat                 # Atalho rápido no Windows com suporte UTF-8 (chcp 65001)
-├── iniciar-bot.bat             # Launcher estilizado no Windows com verificação de saída
-├── .env.example                # Modelo das variáveis de ambiente
-└── package.json                # Dependências e scripts do projeto
+│   ├── dashboardServer.js        # Servidor Express e API REST do painel web (localhost:3000 ou PORT)
+│   ├── embedHelper.js            # Paleta oficial (#8018D8, #FFD700, #EF4444) e builders de embeds
+│   ├── playerEmojis.js           # Sincronização e cache dos 16 Application Emojis (botões e embeds)
+│   ├── queueHelper.js            # Menu interativo numerado da fila e salto direto (!queue)
+│   ├── spotifyPlugin.js          # Suporte completo a links, URIs e playlists do Spotify
+│   ├── vipManager.js             # Persistência e gestão de planos/chaves VIP
+│   └── voiceSessionManager.js    # Controle do responsável da call e permissão de skip/autoplay
+├── public/                       # Interface web (index.html, app.js e style.css) do painel localhost
+├── assets/
+│   ├── banner.png                # Banner oficial usado no /help, na despedida e na menção
+│   ├── iconepremium.png          # Ícone VIP usado nos embeds VIP e no painel web
+│   └── emojis/                   # 16 ícones PNG neon roxos (128×128) dos botões e embeds
+├── data/
+│   ├── player_emojis.json        # Cache local dos IDs dos Application Emojis sincronizados
+│   └── vip_database.json         # Banco JSON local de chaves e servidores VIP
+├── iniciar.bat                   # Launcher Windows em Roxo Neon com UTF-8, checagens e inicialização limpa
+├── .env.example                  # Modelo completo das variáveis de ambiente
+├── .gitignore                    # Regras de arquivos ignorados (node_modules, .env, logs)
+└── package.json                  # Dependências e scripts do projeto
 ```
 
 ---
@@ -113,7 +131,7 @@ discord-music-bot/
 ## 🛠️ Instalação e Configuração
 
 ### 1. Pré-requisitos e Dependências
-Certifique-se de ter o **Node.js** instalado e execute na pasta do projeto:
+Certifique-se de ter o **Node.js** instalado (testado em Node.js v24) e execute na pasta do projeto (o FFmpeg e os codecs Opus já vêm inclusos via dependências):
 
 ```bash
 npm install
@@ -125,22 +143,29 @@ npm install
    * ✅ **Presence Intent**
    * ✅ **Server Members Intent**
    * ✅ **Message Content Intent** *(obrigatório para comandos `!` no chat)*
-3. Em **OAuth2 > URL Generator**, marque os escopos `bot` e `applications.commands`, além das permissões de texto e voz (`Send Messages`, `Embed Links`, `Attach Files`, `Read Message History`, `Connect`, `Speak`).
+3. Em **OAuth2 > URL Generator**, marque os escopos `bot` e `applications.commands`, além das permissões de texto e voz (`Send Messages`, `Manage Messages`, `Embed Links`, `Attach Files`, `Use External Emojis`, `Read Message History`, `Connect`, `Speak`).
+
+> 💡 **Application Emojis automáticos:** Na primeira inicialização online, o bot envia automaticamente os 16 ícones de `assets/emojis/` para a aba *Emojis* da sua aplicação no Discord e salva os IDs em `data/player_emojis.json`. Para substituir algum ícone no futuro, troque o PNG correspondente em `assets/emojis/` e remova a entrada antiga do JSON (e do Developer Portal) antes de reiniciar.
 
 ### 3. Configurar Variáveis de Ambiente (`.env`)
-Crie ou edite o arquivo `.env` na raiz do projeto (baseado em `.env.example`):
+Crie ou edite o arquivo `.env` na raiz do projeto (baseado em [`.env.example`](.env.example)):
 
 ```env
 DISCORD_TOKEN=seu_token_do_discord_aqui
 SUPPORT_SERVER_URL=https://discord.gg/6MFj275a3S
 PORT=3000
+
+# Credenciais opcionais da API do Spotify (Spotify Developer Dashboard)
+SPOTIFY_CLIENT_ID=seu_client_id_do_spotify_aqui
+SPOTIFY_CLIENT_SECRET=seu_client_secret_do_spotify_aqui
+SPOTIFY_COUNTRY=BR
 ```
 
-*(Opcional: caso utilize cookies do YouTube para evitar bloqueios de extração, adicione um arquivo `cookies.txt` na raiz do projeto.)*
+> *(Opcional: caso utilize cookies do YouTube para evitar bloqueios de extração, adicione um arquivo `cookies.txt` na raiz do projeto.)*
 
 ### 4. Iniciar o Bot
 
-* **No Windows (recomendado, já ativa UTF-8 para acentos e emojis):** dê duplo clique em **`iniciar.bat`** ou **`iniciar-bot.bat`**.
+* **No Windows (recomendado, já ativa UTF-8 para acentos e emojis):** dê duplo clique em **[`iniciar.bat`](iniciar.bat)**.
 * **Via terminal:**
   ```bash
   npm start

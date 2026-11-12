@@ -2,6 +2,8 @@
    CHLORINE MUSIC™ • JAVASCRIPT DO PAINEL LOCALHOST
    ============================================================== */
 
+const DEFAULT_ICON_URL = '/assets/iconepremium.png';
+
 let currentGuildId = null;
 let selectedPlanId = '30d';
 let plansData = {};
@@ -134,7 +136,7 @@ function renderGuildsGrid(guilds) {
     const card = document.createElement('div');
     card.className = 'guild-card';
 
-    const iconUrl = g.icon || '/assets/chlorine_gold.webp';
+    const iconUrl = g.icon || DEFAULT_ICON_URL;
     const vipBadge = g.isVip
       ? '<span class="badge badge-gold">👑 VIP Ativo</span>'
       : '<span class="badge badge-normal">Normal</span>';
@@ -143,7 +145,7 @@ function renderGuildsGrid(guilds) {
       : '';
 
     card.innerHTML = `
-      <img src="${iconUrl}" alt="${escapeHtml(g.name)}" class="guild-icon">
+      <img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(g.name)}" class="guild-icon">
       <div class="guild-info">
         <h4>${escapeHtml(g.name)}</h4>
         <p class="guild-members">👥 ${g.memberCount} membros</p>
@@ -240,7 +242,12 @@ async function loadGuildQueue(guildId, isPolling = false) {
       titleEl.textContent = song.name;
       titleEl.title = song.name;
       metaEl.textContent = `Pedido por: ${song.user} • Duração: ${song.formattedDuration}${callSuffix}`;
-      thumbEl.src = song.thumbnail || '/assets/chlorine_gold.webp';
+      thumbEl.onerror = () => {
+        if (!thumbEl.src.endsWith(DEFAULT_ICON_URL)) {
+          thumbEl.src = DEFAULT_ICON_URL;
+        }
+      };
+      thumbEl.src = song.thumbnail || DEFAULT_ICON_URL;
 
       curTimeEl.textContent = q.formattedCurrentTime || '00:00';
       totTimeEl.textContent = song.formattedDuration || '00:00';
@@ -296,7 +303,7 @@ async function loadGuildQueue(guildId, isPolling = false) {
       metaEl.textContent = activeVoice?.name
         ? `Bot conectado em 🔊 ${activeVoice.name} • Dê play abaixo!`
         : 'Use o formulário abaixo para tocar qualquer música no canal!';
-      thumbEl.src = '/assets/chlorine_gold.webp';
+      thumbEl.src = DEFAULT_ICON_URL;
       fillEl.style.width = '0%';
       curTimeEl.textContent = '00:00';
       totTimeEl.textContent = '00:00';
@@ -304,6 +311,8 @@ async function loadGuildQueue(guildId, isPolling = false) {
       statusBadge.className = 'queue-status-badge badge badge-normal';
       soundwave.style.display = 'none';
       pauseIcon.textContent = '⏸️';
+      autoplayBtn.classList.remove('active');
+      document.getElementById('autoplay-text').textContent = 'Autoplay: OFF';
       repeatBtn.classList.remove('active');
       repeatText.textContent = 'Repetir: OFF';
       prevBtn.disabled = true;
@@ -368,7 +377,7 @@ function renderQueueList(songs, activeVoiceName = null) {
     item.innerHTML = `
       ${isPlaying ? '' : '<span class="queue-drag-handle" title="Arraste para reordenar">⋮⋮</span>'}
       <span class="queue-index">${isPlaying ? '▶' : idx}</span>
-      <img src="${s.thumbnail || '/assets/chlorine_gold.webp'}" alt="Thumb" class="queue-thumb">
+      <img src="${escapeHtml(s.thumbnail || DEFAULT_ICON_URL)}" alt="Thumb" class="queue-thumb">
       <div class="queue-info">
         <div class="queue-name" title="${safeName}">${safeName}</div>
         <div class="queue-req">${subText}</div>
@@ -678,17 +687,18 @@ async function loadVipGuildsTable() {
         : '<span class="badge badge-normal">🔴 Expirado</span>';
 
       tr.innerHTML = `
-        <td><strong>${g.guildName}</strong><br><small style="color:var(--text-muted)">${g.guildId}</small></td>
-        <td><span class="pill-gold">${g.planName}</span></td>
-        <td><strong>${g.formattedRemaining}</strong></td>
-        <td>${g.formattedExpiresAt}</td>
+        <td><strong>${escapeHtml(g.guildName)}</strong><br><small style="color:var(--text-muted)">${escapeHtml(g.guildId)}</small></td>
+        <td><span class="pill-gold">${escapeHtml(g.planName)}</span></td>
+        <td><strong>${escapeHtml(g.formattedRemaining)}</strong></td>
+        <td>${escapeHtml(g.formattedExpiresAt)}</td>
         <td>${statusBadge}</td>
         <td>
-          <button class="btn btn-sm btn-outline" style="color: var(--danger); border-color: rgba(239,68,68,0.3)" onclick="revokeGuildVip('${g.guildId}')">
+          <button type="button" class="btn btn-sm btn-outline btn-revoke-vip" style="color: var(--danger); border-color: rgba(239,68,68,0.3)">
             ❌ Revogar
           </button>
         </td>
       `;
+      tr.querySelector('.btn-revoke-vip').addEventListener('click', () => window.revokeGuildVip(g.guildId));
 
       tbody.appendChild(tr);
     });
@@ -716,21 +726,23 @@ async function loadVipKeysTable() {
         : '<span class="badge badge-gold">🟢 Disponível</span>';
 
       const usedInfo = k.usedInGuildName
-        ? `<strong>${k.usedInGuildName}</strong>`
+        ? `<strong>${escapeHtml(k.usedInGuildName)}</strong>`
         : '<span style="color:var(--text-muted)">Não utilizado</span>';
 
       tr.innerHTML = `
-        <td><code>${k.code}</code></td>
-        <td>${k.planName}</td>
-        <td>${k.durationDays} dias</td>
+        <td><code>${escapeHtml(k.code)}</code></td>
+        <td>${escapeHtml(k.planName)}</td>
+        <td>${Number(k.durationDays) || 0} dias</td>
         <td>${statusBadge}</td>
         <td>${usedInfo}</td>
-        <td><small style="color:var(--text-secondary)">${k.note || '-'}</small></td>
+        <td><small style="color:var(--text-secondary)">${escapeHtml(k.note || '-')}</small></td>
         <td>
-          <button class="btn btn-sm btn-outline" onclick="copyKeyText('${k.code}')">📋 Copiar</button>
-          <button class="btn btn-sm btn-outline" style="color: var(--danger)" onclick="deleteVipKey('${k.code}')">🗑️</button>
+          <button type="button" class="btn btn-sm btn-outline btn-copy-key">📋 Copiar</button>
+          <button type="button" class="btn btn-sm btn-outline btn-delete-key" style="color: var(--danger)">🗑️</button>
         </td>
       `;
+      tr.querySelector('.btn-copy-key').addEventListener('click', () => window.copyKeyText(k.code));
+      tr.querySelector('.btn-delete-key').addEventListener('click', () => window.deleteVipKey(k.code));
 
       tbody.appendChild(tr);
     });
