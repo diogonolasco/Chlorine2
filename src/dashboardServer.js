@@ -7,6 +7,7 @@ const { normalizePlayQuery } = require('./spotifyPlugin');
 
 function createDashboardServer(client, distube, port = 3000, { quiet = false, testing = false } = {}) {
   const app = express();
+  app.enable('trust proxy');
 
   // Chave secreta de sessão (assinatura HMAC-SHA256)
   const sessionSecret =
@@ -26,6 +27,16 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
   function isLocalRequest(req) {
     const ip = req.ip || req.socket?.remoteAddress || '';
     return ip.includes('127.0.0.1') || ip === '::1' || req.hostname === 'localhost';
+  }
+
+  function getBaseUrl(req) {
+    if (process.env.DASHBOARD_URL && !process.env.DASHBOARD_URL.includes('seu-subdominio')) {
+      return process.env.DASHBOARD_URL.replace(/\/+$/, '');
+    }
+    const host = req.get('host') || '';
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || host.includes('shardweb.app');
+    const proto = isHttps ? 'https' : 'http';
+    return `${proto}://${host}`.replace(/\/+$/, '');
   }
 
   // Middleware de extração e validação de sessão OAuth2
@@ -139,7 +150,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
               <li>No menu lateral, vá em <strong>OAuth2</strong> &rarr; <strong>General</strong>.</li>
               <li>Em <strong>Client Secret</strong>, clique em <strong>Reset Secret</strong> e copie o valor gerado.</li>
               <li>Adicione nas variáveis de ambiente (arquivo <code>.env</code> ou painel ShardCloud):<br><code>DISCORD_CLIENT_SECRET=seu_secret_aqui</code></li>
-              <li>Na seção <strong>Redirects</strong>, adicione a URL de retorno:<br><code>${(process.env.DASHBOARD_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '')}/auth/callback</code></li>
+              <li>Na seção <strong>Redirects</strong>, adicione a URL de retorno:<br><code>${getBaseUrl(req)}/auth/callback</code></li>
             </ol>
             <a href="/" class="btn">&larr; Voltar ao Painel</a>
           </div>
@@ -148,7 +159,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       `);
     }
 
-    const baseUrl = (process.env.DASHBOARD_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const baseUrl = getBaseUrl(req);
     const redirectUri = `${baseUrl}/auth/callback`;
     const state = crypto.randomBytes(16).toString('hex');
 
@@ -185,7 +196,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const clientId = process.env.DISCORD_CLIENT_ID || client.user?.id;
     const clientSecret = process.env.DISCORD_CLIENT_SECRET;
-    const baseUrl = (process.env.DASHBOARD_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const baseUrl = getBaseUrl(req);
     const redirectUri = `${baseUrl}/auth/callback`;
 
     try {
