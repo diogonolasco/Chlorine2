@@ -27,6 +27,20 @@
       "usedInGuildId": "1500878945879457874",
       "usedInGuildName": "anonimos",
       "usedAt": 1794436067956
+    },
+    "CHLORINE-VIP-90D-6CAA8A-CDE4B7": {
+      "code": "CHLORINE-VIP-90D-6CAA8A-CDE4B7",
+      "planId": "90d",
+      "planName": "Plano Platina (90 Dias)",
+      "durationDays": 90,
+      "createdAt": 1794636074756,
+      "createdBy": "Dashboard Localhost",
+      "note": "Painel Local",
+      "used": true,
+      "usedBy": "767166234117931048",
+      "usedInGuildId": "697044962365145129",
+      "usedInGuildName": "Garotes de Programa",
+      "usedAt": 1794636080807
     }
   },
   "guilds": {
@@ -73,6 +87,17 @@
       "expiresAt": 1802229612124,
       "activatedBy": "767166234117931048",
       "note": ""
+    },
+    "697044962365145129": {
+      "guildId": "697044962365145129",
+      "guildName": "Garotes de Programa",
+      "planId": "90d",
+      "planName": "Plano Platina (90 Dias)",
+      "durationDays": 90,
+      "activatedAt": 1794636080807,
+      "expiresAt": 1802412080807,
+      "activatedBy": "767166234117931048",
+      "keyCode": "CHLORINE-VIP-90D-6CAA8A-CDE4B7"
     }
   }
 }

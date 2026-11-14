@@ -171,9 +171,9 @@ client.once('clientReady', async () => {
 
   client.user.setPresence({
     activities: [{
-      name: '!play ou /play | Música',
-      type: ActivityType.Custom,
-      state: '!play ou /play | Música'
+      name: 'Comece usando !help',
+      type: ActivityType.Streaming,
+      url: 'https://www.twitch.tv/discord'
     }],
     status: 'online'
   });

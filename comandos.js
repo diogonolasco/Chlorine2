@@ -629,7 +629,7 @@ function createCommandsModule({
         });
       }
       if (onPrefixSkipSuccess) {
-        await onPrefixSkipSuccess();
+        onPrefixSkipSuccess();
       }
     } catch (err) {
       queue._isSkipped = false;
@@ -1202,47 +1202,6 @@ function createCommandsModule({
   }
 
   /**
-   * Apaga a mensagem de comando do usuário (com segurança caso o bot não tenha permissão)
-   * para manter o chat limpo, sem preview de links ou comandos acumulados.
-   */
-  async function deleteUserMessage(message) {
-    if (!message || message._deleteAttempted || typeof message.delete !== 'function') {
-      return false;
-    }
-    message._deleteAttempted = true;
-    try {
-      await message.delete();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Envia a resposta diretamente no canal (evitando "A mensagem original foi apagada" no Discord)
-   * e apaga em seguida a mensagem que disparou o comando.
-   */
-  async function sendCleanMessage(message, payload) {
-    const sent =
-      typeof message?.channel?.send === 'function'
-        ? await message.channel.send(payload)
-        : await message.reply(payload);
-    await deleteUserMessage(message);
-    return sent;
-  }
-
-  /**
-   * Ao pular faixa via prefixo, tenta apagar o comando do usuário;
-   * caso falte permissão de apagar no canal, reage com ⏭️ como fallback.
-   */
-  async function deleteOrReactSkip(message) {
-    const removed = await deleteUserMessage(message);
-    if (!removed && typeof message?.react === 'function') {
-      await message.react('⏭️').catch(() => {});
-    }
-  }
-
-  /**
    * Trata todas as mensagens de texto (@menção, resposta numérica na fila e comandos !).
    */
   async function handleMessage(message) {
@@ -1250,7 +1209,7 @@ function createCommandsModule({
 
     // Resposta quando o bot é mencionado (@Chlorine Music™)
     if (message.mentions.has(client.user.id) && !message.mentions.everyone && !message.content.startsWith(PREFIX)) {
-      return sendCleanMessage(message, createMentionPayload());
+      return message.reply(createMentionPayload());
     }
 
     // Se o usuário responder (Reply) à mensagem da fila apenas com o número da música (ex: 3)
@@ -1262,17 +1221,17 @@ function createCommandsModule({
         refMsg.author?.id === client.user?.id &&
         refMsg.embeds?.[0]?.title?.includes('Fila de Reprodução')
       ) {
-        if (!handleVipFeatureGate({ guildId: message.guild.id, userId: message.author.id, isSlash: false, replyFn: (payload) => sendCleanMessage(message, payload) })) {
+        if (!handleVipFeatureGate({ guildId: message.guild.id, userId: message.author.id, isSlash: false, replyFn: (payload) => message.reply(payload) })) {
           return;
         }
         const queue = distube.getQueue(message.guild.id);
         if (!queue) {
-          return sendCleanMessage(message, {
+          return message.reply({
             embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma fila de músicas ativa no momento!' })]
           });
         }
         return handleNumericQueueJump(queue, message.guild.id, message.author.id, trimmedContent, (payload) =>
-          sendCleanMessage(message, payload)
+          message.reply(payload)
         );
       }
     }
@@ -1289,7 +1248,7 @@ function createCommandsModule({
     // Impede qualquer outro comando no canal enquanto uma limpeza !clear estiver em andamento
     const channelId = message.channel?.id;
     if (channelId && activeClearChannels.has(channelId)) {
-      const waitMsg = await sendCleanMessage(message, {
+      const waitMsg = await message.reply({
         embeds: [
           statusEmbed({
             type: 'error',
@@ -1300,6 +1259,7 @@ function createCommandsModule({
       if (clearAutoDeleteMs > 0) {
         setTimeout(() => {
           waitMsg?.delete?.().catch(() => {});
+          message.delete?.().catch(() => {});
         }, Math.min(clearAutoDeleteMs, 4000)).unref?.();
       }
       return;
@@ -1312,7 +1272,7 @@ function createCommandsModule({
         (message.guild?.ownerId && message.guild.ownerId === message.author?.id)
       );
       if (!isAdmin) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [
             statusEmbed({
               type: 'error',
@@ -1328,7 +1288,7 @@ function createCommandsModule({
           !botPerms.has(PermissionFlagsBits.ManageMessages) ||
           !botPerms.has(PermissionFlagsBits.ReadMessageHistory)
         ) {
-          return sendCleanMessage(message, {
+          return message.reply({
             embeds: [
               statusEmbed({
                 type: 'error',
@@ -1342,7 +1302,7 @@ function createCommandsModule({
       const rawCount = (args[0] || '').trim();
       const amount = /^\d+$/.test(rawCount) ? parseInt(rawCount, 10) : NaN;
       if (!Number.isInteger(amount) || amount < 1 || amount > MAX_CLEAR_MESSAGES) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [
             statusEmbed({
               type: 'error',
@@ -1353,7 +1313,7 @@ function createCommandsModule({
       }
 
       if (!message.channel?.messages?.fetch || typeof message.channel?.bulkDelete !== 'function') {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [statusEmbed({ type: 'error', description: '❌ Não foi possível limpar mensagens neste canal.' })]
         });
       }
@@ -1459,14 +1419,14 @@ function createCommandsModule({
     if (command === 'play' || command === 'p') {
       const voiceChannel = message.member?.voice?.channel;
       if (!voiceChannel) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [statusEmbed({ type: 'error', description: '❌ Você precisa entrar em um canal de voz primeiro!' })]
         });
       }
 
       const query = normalizePlayQuery(args.join(' '));
       if (!query) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [
             statusEmbed({
               type: 'error',
@@ -1496,8 +1456,6 @@ function createCommandsModule({
             })
           ]
         }).catch(() => {});
-      } finally {
-        await deleteUserMessage(message);
       }
       return;
     }
@@ -1510,8 +1468,8 @@ function createCommandsModule({
         queue: distube.getQueue(message),
         leaveTarget: message,
         isSlash: false,
-        replyFn: (payload) => sendCleanMessage(message, payload),
-        onPrefixSkipSuccess: () => deleteOrReactSkip(message)
+        replyFn: (payload) => message.reply(payload),
+        onPrefixSkipSuccess: () => message.react('⏭️').catch(() => {})
       });
     }
 
@@ -1521,7 +1479,7 @@ function createCommandsModule({
       const voice = distube.voices.get(message);
 
       if (!queue && !voice) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [statusEmbed({ type: 'error', description: '❌ O bot não está em nenhum canal de voz no momento!' })]
         });
       }
@@ -1532,9 +1490,7 @@ function createCommandsModule({
       }
       distube.voices.leave(message);
       voiceSession.clearVoiceSummoner(message.guild.id);
-      const sent = await targetChannel.send(createLeavePayload());
-      await deleteUserMessage(message);
-      return sent;
+      return targetChannel.send(createLeavePayload());
     }
 
     // COMANDO: !pause (ou !pausar)
@@ -1544,7 +1500,7 @@ function createCommandsModule({
         userId: message.author.id,
         queue: distube.getQueue(message),
         isSlash: false,
-        replyFn: (payload) => sendCleanMessage(message, payload)
+        replyFn: (payload) => message.reply(payload)
       });
     }
 
@@ -1555,7 +1511,7 @@ function createCommandsModule({
         userId: message.author.id,
         queue: distube.getQueue(message),
         isSlash: false,
-        replyFn: (payload) => sendCleanMessage(message, payload)
+        replyFn: (payload) => message.reply(payload)
       });
     }
 
@@ -1567,7 +1523,7 @@ function createCommandsModule({
         queue: distube.getQueue(message),
         jumpArg: args.length > 0 ? args[0] : null,
         isSlash: false,
-        replyFn: (payload) => sendCleanMessage(message, payload)
+        replyFn: (payload) => message.reply(payload)
       });
     }
 
@@ -1575,11 +1531,11 @@ function createCommandsModule({
     if (['nowplaying', 'np', 'tocando'].includes(command)) {
       const queue = distube.getQueue(message);
       if (!queue) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [statusEmbed({ type: 'error', description: '❌ Nenhuma música está tocando no momento!' })]
         });
       }
-      return sendCleanMessage(message, createNowPlayingPayload(message.guild.id, queue));
+      return message.reply(createNowPlayingPayload(message.guild.id, queue));
     }
 
     // COMANDO: !volume (ou !vol, !v)
@@ -1590,7 +1546,7 @@ function createCommandsModule({
         queue: distube.getQueue(message),
         volume: parseInt(args[0], 10),
         isSlash: false,
-        replyFn: (payload) => sendCleanMessage(message, payload)
+        replyFn: (payload) => message.reply(payload)
       });
     }
 
@@ -1601,13 +1557,13 @@ function createCommandsModule({
         userId: message.author.id,
         queue: distube.getQueue(message),
         isSlash: false,
-        replyFn: (payload) => sendCleanMessage(message, payload)
+        replyFn: (payload) => message.reply(payload)
       });
     }
 
     // COMANDO: !vip (ou !premium)
     if (['vip', 'premium'].includes(command)) {
-      return sendCleanMessage(message, createVipEmbed(message.guild.id, message.guild.name));
+      return message.reply(createVipEmbed(message.guild.id, message.guild.name));
     }
 
     // COMANDO SECRETO: !setvip ou !vipset (Somente o dono — totalmente invisível para outros usuários)
@@ -1618,7 +1574,7 @@ function createCommandsModule({
 
       const code = args[0];
       if (!code) {
-        return sendCleanMessage(message, {
+        return message.reply({
           embeds: [
             statusEmbed({
               type: 'vip',
@@ -1640,12 +1596,12 @@ function createCommandsModule({
         userTag: message.author.tag,
         commandPrefixLabel: '!'
       });
-      return sendCleanMessage(message, payload);
+      return message.reply(payload);
     }
 
     // COMANDO: !help (ou !ajuda, !comandos, !h)
     if (['help', 'ajuda', 'comandos', 'h'].includes(command)) {
-      return sendCleanMessage(message, createHelpPayload());
+      return message.reply(createHelpPayload());
     }
   }
 
