@@ -75,8 +75,19 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
     next();
   });
 
-  app.use(express.static(path.join(__dirname, '..', 'public')));
-  app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
+  app.use(express.static(path.join(__dirname, '..', 'public'), {
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html') || filePath.endsWith('.css') || filePath.endsWith('.js')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    }
+  }));
+  app.use('/assets', express.static(path.join(__dirname, '..', 'assets'), {
+    maxAge: '1d'
+  }));
 
   /**
    * Localiza o canal de voz ativo em que o bot está conectado no servidor.

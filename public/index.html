@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.6.0">
 </head>
 <body>
   <!-- Efeito de Fundo Luminoso Neon -->
@@ -246,12 +246,17 @@
         </div>
       </div>
 
-      <div class="card mt-20">
+      <div class="card card-section mt-20">
         <div class="card-header">
-          <h3>👑 Servidores VIP que Você Administra</h3>
+          <div class="card-header-left">
+            <span class="header-icon">👑</span>
+            <div>
+              <h3>Servidores VIP que Você Administra</h3>
+              <p class="section-subtitle">Gerencie as músicas, volume e funções VIP em seus servidores autorizados</p>
+            </div>
+          </div>
           <span class="badge badge-gold" id="my-vips-badge">0 Servidores</span>
         </div>
-        <p class="section-desc">Clique no botão "Controlar no Player" para gerenciar as músicas e funções do bot no servidor selecionado.</p>
         <div class="guilds-grid" id="my-vips-grid">
           <!-- Renderizado dinamicamente -->
         </div>
@@ -421,14 +426,17 @@
     <!-- ABA 4: SERVIDORES CONECTADOS -->
     <!-- ============================================== -->
     <section class="tab-content" id="tab-guilds">
-      <div class="card">
+      <div class="card card-section">
         <div class="card-header">
-          <h3>🌍 Servidores Conectados ao Chlorine Music™</h3>
+          <div class="card-header-left">
+            <span class="header-icon">🌍</span>
+            <div>
+              <h3>Servidores Conectados ao Chlorine Music™</h3>
+              <p class="section-subtitle">Todos os servidores do Discord onde o bot está presente e pronto para tocar</p>
+            </div>
+          </div>
           <span class="badge badge-cyan" id="guilds-total-badge">0 Servidores</span>
         </div>
-        <p class="section-desc">
-          Lista de todos os servidores do Discord onde o bot está presente.
-        </p>
         <div class="guilds-grid" id="guilds-grid-container">
           <!-- Renderizado dinamicamente -->
         </div>
@@ -444,6 +452,6 @@
     <p>© 2026 <strong>Chlorine Music™</strong> • Desenvolvido por <strong>.nolasco7</strong> (ID: <code>767166234117931048</code>) • <a href="https://discord.gg/6MFj275a3S" target="_blank" style="color: var(--cyan); text-decoration: none; font-weight: 600;">💬 Servidor Oficial Chlorine (discord.gg/6MFj275a3S)</a></p>
   </footer>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.6.0"></script>
 </body>
 </html>

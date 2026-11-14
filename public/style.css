@@ -1025,26 +1025,50 @@ body {
 }
 
 /* ==============================================================
-   CARDS DE SERVIDORES (VIP E CONECTADOS)
+   CARDS DE SERVIDORES ULTRA MODERNOS (VIP E CONECTADOS)
    ============================================================== */
+.card-section {
+  padding: 24px 26px;
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.section-subtitle {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
 .guilds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 22px;
   width: 100%;
+  margin-top: 18px;
 }
 
 .guild-card {
-  background: rgba(14, 18, 27, 0.85);
+  background: linear-gradient(160deg, rgba(20, 26, 42, 0.95) 0%, rgba(10, 13, 22, 0.98) 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-lg);
-  padding: 18px;
+  border-radius: 18px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 14px;
-  transition: var(--transition);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   position: relative;
   overflow: hidden;
 }
@@ -1056,52 +1080,87 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, var(--border-cyan), transparent);
-  opacity: 0.7;
+  background: linear-gradient(90deg, transparent, var(--cyan-primary), transparent);
+  opacity: 0.5;
+  transition: var(--transition);
 }
 
 .guild-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--cyan-primary);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 16px var(--cyan-glow);
+  transform: translateY(-4px);
+  border-color: rgba(0, 216, 230, 0.45);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 24px var(--cyan-glow);
 }
 
+.guild-card:hover::before {
+  opacity: 1;
+}
+
+/* Card VIP com aura dourada exclusiva */
 .guild-card.guild-card-vip {
-  border-color: rgba(255, 215, 0, 0.35);
-  background: linear-gradient(160deg, rgba(22, 26, 40, 0.95), rgba(12, 15, 24, 0.9));
+  border-color: rgba(255, 215, 0, 0.32);
+  background: linear-gradient(160deg, rgba(28, 25, 20, 0.95) 0%, rgba(14, 15, 24, 0.98) 100%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.2);
 }
 
 .guild-card.guild-card-vip::before {
   background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
-  opacity: 1;
+  opacity: 0.85;
 }
 
 .guild-card.guild-card-vip:hover {
   border-color: var(--gold-primary);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 22px var(--gold-glow);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 30px var(--gold-glow);
 }
 
+/* Cabeçalho do Card */
 .guild-card-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
 }
 
-.guild-card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  object-fit: cover;
-  background: #0d1117;
-  border: 2px solid var(--border-cyan);
+.guild-card-avatar-wrap {
+  position: relative;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.guild-card-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: #090c14;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  display: block;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: var(--transition);
+}
+
+.guild-card:hover .guild-card-icon {
+  border-color: var(--cyan-primary);
 }
 
 .guild-card.guild-card-vip .guild-card-icon {
   border-color: var(--gold-primary);
-  box-shadow: 0 0 12px var(--gold-glow);
+  box-shadow: 0 0 14px var(--gold-glow);
+}
+
+.guild-avatar-badge-vip {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background: var(--gold-primary);
+  color: #000;
+  font-size: 0.68rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  border: 2px solid #07090E;
 }
 
 .guild-card-title {
@@ -1110,36 +1169,42 @@ body {
 }
 
 .guild-card-title h4 {
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.12rem;
+  font-weight: 800;
   color: #FFF;
-  margin: 0 0 2px 0;
+  margin: 0 0 4px 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+  letter-spacing: -0.2px;
 }
 
 .guild-card-id {
+  display: inline-block;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: #64748B;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   letter-spacing: 0.5px;
-  display: block;
 }
 
+/* Corpo do Card: Chips de Dados */
 .guild-card-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.28);
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  font-size: 0.82rem;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 2px;
 }
 
-.guild-card-meta {
+.guild-chips-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1147,33 +1212,74 @@ body {
   flex-wrap: wrap;
 }
 
-.guild-card-meta strong {
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.chip-members {
+  background: rgba(255, 255, 255, 0.06);
+  color: #E2E8F0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chip-members strong {
   color: #FFF;
 }
 
-.guild-card-time {
-  font-size: 0.8rem;
-  color: var(--gold-secondary);
+.chip-vip {
+  background: rgba(255, 215, 0, 0.15);
+  color: #FFD700;
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  font-weight: 700;
 }
 
-.guild-card-time strong {
-  color: var(--gold-primary);
+.chip-normal {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94A3B8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-.guild-card-voice {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px;
+.chip-playing {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
-.guild-card-voice strong {
-  color: var(--cyan-primary);
+.chip-idle {
+  background: rgba(255, 255, 255, 0.04);
+  color: #64748B;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.chip-voice {
+  background: rgba(255, 255, 255, 0.04);
+  color: #94A3B8;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-voice.active {
+  background: rgba(0, 216, 230, 0.12);
+  color: #00D8E6;
+  border: 1px solid rgba(0, 216, 230, 0.35);
+}
+
+.chip-time {
+  background: rgba(255, 215, 0, 0.1);
+  color: #FCD34D;
+  border: 1px solid rgba(255, 215, 0, 0.25);
+}
+
+/* Rodapé & Botão de Ação */
 .guild-card-footer {
   width: 100%;
   margin-top: auto;
@@ -1181,23 +1287,50 @@ body {
 
 .guild-card-footer .btn {
   width: 100%;
-  padding: 10px 14px;
-  font-size: 0.86rem;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.92rem;
   font-weight: 700;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.25s ease;
 }
 
-.guild-card .pill-gold {
-  padding: 3px 8px;
-  font-size: 0.74rem;
-  border-radius: 999px;
-  font-weight: 700;
+.guild-card-footer .btn-gold {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  color: #000;
+  box-shadow: 0 4px 16px rgba(255, 215, 0, 0.35);
 }
 
-.guild-card .badge {
-  padding: 3px 8px;
-  font-size: 0.74rem;
-  border-radius: 999px;
+.guild-card-footer .btn-gold:hover {
+  background: linear-gradient(135deg, #FFF 0%, #FFD700 100%);
+  box-shadow: 0 6px 22px rgba(255, 215, 0, 0.55);
+  transform: translateY(-2px);
+}
+
+.btn-cyan-outline {
+  background: rgba(0, 216, 230, 0.08);
+  border: 1px solid rgba(0, 216, 230, 0.4) !important;
+  color: #00D8E6 !important;
+}
+
+.btn-cyan-outline:hover {
+  background: var(--cyan-primary) !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px var(--cyan-glow);
+  transform: translateY(-2px);
+}
+
+.btn-arrow {
+  transition: transform 0.25s ease;
+}
+
+.guild-card-footer .btn:hover .btn-arrow {
+  transform: translateX(4px);
 }
 
 /* ==============================================================

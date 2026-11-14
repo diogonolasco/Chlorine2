@@ -194,7 +194,13 @@ function createCommandsModule({
     const authorIcon = botAvatarUrl || iconAsset.url || undefined;
 
     const supportUrl = process.env.SUPPORT_SERVER_URL || DEFAULT_SUPPORT_URL;
+    const websiteUrl = (process.env.DASHBOARD_URL || 'https://chlorine.shardweb.app').replace(/\/auth\/callback\/?$/, '').replace(/\/$/, '');
     const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Acessar Painel Web')
+        .setStyle(ButtonStyle.Link)
+        .setURL(websiteUrl)
+        .setEmoji('🌐'),
       new ButtonBuilder()
         .setLabel('Entrar no Servidor Oficial')
         .setStyle(ButtonStyle.Link)
@@ -215,6 +221,7 @@ function createCommandsModule({
         title: '👑 Chlorine Music™ VIP • Status do Servidor',
         description:
           `✨ Parabéns! **${guildName}** possui acesso **Chlorine VIP Ativo**.\n` +
+          `> 🌐 **Painel Web Oficial:** [chlorine.shardweb.app](${websiteUrl})\n` +
           '> Todos os membros da call aproveitam recursos desbloqueados com áudio HD prioritário!',
         thumbnail: iconAsset.url || authorIcon,
         fields: [
@@ -232,6 +239,11 @@ function createCommandsModule({
               `> ${vipEmoji} **Visual Dourado VIP** — Cards e destaques exclusivos no servidor`
             ].join('\n'),
             inline: false
+          },
+          {
+            name: '🌐 Controle Pelo Site',
+            value: `> Gerencie suas músicas e status em tempo real: **[chlorine.shardweb.app](${websiteUrl})**`,
+            inline: false
           }
         ],
         footerText: FOOTER_TEXT
@@ -245,6 +257,7 @@ function createCommandsModule({
       title: '👑 Chlorine Music™ VIP • Eleve sua Experiência Sonora',
       description:
         `O servidor **${guildName}** ainda está no plano gratuito.\n` +
+        `> 🌐 **Acesse o site oficial:** [chlorine.shardweb.app](${websiteUrl})\n` +
         '> Desbloqueie controle total da fila, volume amplificado até `200%`, Autoplay contínuo e prioridade de áudio HD!',
       thumbnail: iconAsset.url || authorIcon,
       fields: [
@@ -272,8 +285,9 @@ function createCommandsModule({
           inline: false
         },
         {
-          name: '🛒 Como Ativar no Seu Servidor',
+          name: '🌐 Painel Web & Ativação Online',
           value:
+            `> Acesse o painel pelo navegador: **[chlorine.shardweb.app](${websiteUrl})**\n` +
             `> Entre no servidor oficial: **[discord.gg/6MFj275a3S](${supportUrl})**\n` +
             '> A ativação no servidor escolhido é imediata após a confirmação!',
           inline: false
@@ -379,18 +393,22 @@ function createCommandsModule({
     const files = [bannerAsset.attachment, logoAsset.attachment].filter(Boolean);
     const iconUrl = logoAsset.url || getBotAvatarUrl() || undefined;
     const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`;
+    const websiteUrl = (process.env.DASHBOARD_URL || 'https://chlorine.shardweb.app').replace(/\/auth\/callback\/?$/, '').replace(/\/$/, '');
+    const supportUrl = process.env.SUPPORT_SERVER_URL || DEFAULT_SUPPORT_URL;
 
     const embed = statusEmbed({
       type: 'info',
       title: '👋 Olá! Eu sou o Chlorine Music™',
       description:
         'Experiência musical em alta fidelidade para o seu servidor Discord.\n' +
-        'Use **`/play`** ou **`!play <música>`** em uma call, ou digite **`/help`**.',
+        'Use **`/play`** ou **`!play <música>`** em uma call, ou digite **`/help`**.\n\n' +
+        `🌐 **Painel Web Oficial:** [chlorine.shardweb.app](${websiteUrl})`,
       thumbnail: iconUrl,
       fields: [
         { name: '👑 Criador', value: '`.nolasco7`', inline: true },
         { name: '🌍 Servidores', value: `\`${client.guilds.cache.size}\``, inline: true },
-        { name: '📡 Streaming', value: '`YouTube & Spotify`', inline: true }
+        { name: '📡 Streaming', value: '`YouTube & Spotify`', inline: true },
+        { name: '🌐 Painel Web', value: `> Acesse o painel online: **[chlorine.shardweb.app](${websiteUrl})**`, inline: false }
       ],
       footerText: FOOTER_TEXT
     });
@@ -402,10 +420,20 @@ function createCommandsModule({
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel('Me adicione ao seu servidor')
-        .setEmoji('🔗')
+        .setLabel('Acessar Painel Web')
+        .setEmoji('🌐')
         .setStyle(ButtonStyle.Link)
-        .setURL(inviteUrl)
+        .setURL(websiteUrl),
+      new ButtonBuilder()
+        .setLabel('Me Adicionar')
+        .setEmoji('➕')
+        .setStyle(ButtonStyle.Link)
+        .setURL(inviteUrl),
+      new ButtonBuilder()
+        .setLabel('Servidor Oficial')
+        .setEmoji('💬')
+        .setStyle(ButtonStyle.Link)
+        .setURL(supportUrl)
     );
 
     return { embeds: [embed], components: [row], files };

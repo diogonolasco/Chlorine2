@@ -171,27 +171,31 @@ function renderMyVipGuilds(guilds) {
 
     card.innerHTML = `
       <div class="guild-card-header">
-        <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon" onerror="this.src='${DEFAULT_ICON_URL}'">
+        <div class="guild-card-avatar-wrap">
+          <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon" onerror="this.src='${DEFAULT_ICON_URL}'">
+          <span class="guild-avatar-badge-vip" title="Servidor VIP">👑</span>
+        </div>
         <div class="guild-card-title">
           <h4 title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</h4>
-          <span class="guild-card-id">${escapeHtml(g.id)}</span>
+          <span class="guild-card-id">ID: ${escapeHtml(g.id)}</span>
         </div>
       </div>
       <div class="guild-card-body">
-        <div class="guild-card-meta">
-          <span>👥 Membros: <strong>${g.memberCount}</strong></span>
-          <span class="pill-gold">👑 ${escapeHtml(planName)}</span>
+        <div class="guild-chips-row">
+          <span class="chip chip-members">👥 <strong>${g.memberCount}</strong> membros</span>
+          <span class="chip chip-vip">👑 ${escapeHtml(planName)}</span>
         </div>
-        <div class="guild-card-time">
-          ⏳ Tempo restante: <strong>${escapeHtml(remaining)}</strong>
-        </div>
-        <div class="guild-card-voice">
-          🔊 Call Ativa: <strong>${escapeHtml(g.voiceChannelName || 'Nenhuma')}</strong>
+        <div class="guild-chips-row">
+          <span class="chip chip-time">⏳ Restante: <strong>${escapeHtml(remaining)}</strong></span>
+          <span class="chip chip-voice ${g.voiceChannelName ? 'active' : ''}">
+            🔊 ${escapeHtml(g.voiceChannelName || 'Sem call')}
+          </span>
         </div>
       </div>
       <div class="guild-card-footer">
-        <button class="btn btn-gold btn-sm w-100 btn-select-my-vip" data-guild-id="${escapeHtml(g.id)}">
-          🎛️ Controlar no Player
+        <button class="btn btn-gold btn-select-my-vip" data-guild-id="${escapeHtml(g.id)}">
+          <span>🎛️ Controlar no Player</span>
+          <svg class="btn-arrow" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42 5.43 5.43H5v2z"/></svg>
         </button>
       </div>
     `;
@@ -321,39 +325,42 @@ function renderGuildsGrid(guilds) {
     card.className = g.isVip ? 'guild-card guild-card-vip' : 'guild-card';
 
     const iconUrl = g.icon || DEFAULT_ICON_URL;
-    const vipBadge = g.isVip
-      ? '<span class="pill-gold">👑 VIP Ativo</span>'
-      : '<span class="badge badge-normal">Normal</span>';
+    const isVip = Boolean(g.isVip);
+    const planName = g.vipInfo?.planName || (isVip ? 'VIP Ativo' : 'Plano Livre');
 
     const playingTag = g.hasActiveQueue
-      ? '<span class="badge badge-gold">🎵 Tocando Agora</span>'
-      : '<span style="color:var(--text-muted)">Parado</span>';
+      ? '<span class="chip chip-playing">🎵 Tocando Agora</span>'
+      : '<span class="chip chip-idle">⏸️ Parado</span>';
 
-    const callInfo = g.voiceChannelName
-      ? `<span class="badge badge-cyan" style="font-size:0.75rem;">🔊 Call: ${escapeHtml(g.voiceChannelName)}</span>`
-      : '';
+    const callChip = g.voiceChannelName
+      ? `<span class="chip chip-voice active">🔊 ${escapeHtml(g.voiceChannelName)}</span>`
+      : `<span class="chip chip-voice">🔊 Sem call</span>`;
 
     card.innerHTML = `
       <div class="guild-card-header">
-        <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon" onerror="this.src='${DEFAULT_ICON_URL}'">
+        <div class="guild-card-avatar-wrap">
+          <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon" onerror="this.src='${DEFAULT_ICON_URL}'">
+          ${isVip ? '<span class="guild-avatar-badge-vip" title="Servidor VIP">👑</span>' : ''}
+        </div>
         <div class="guild-card-title">
           <h4 title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</h4>
-          <span class="guild-card-id">${escapeHtml(g.id)}</span>
+          <span class="guild-card-id">ID: ${escapeHtml(g.id)}</span>
         </div>
       </div>
       <div class="guild-card-body">
-        <div class="guild-card-meta">
-          <span>👥 Membros: <strong>${g.memberCount}</strong></span>
-          ${vipBadge}
+        <div class="guild-chips-row">
+          <span class="chip chip-members">👥 <strong>${g.memberCount}</strong> membros</span>
+          ${isVip ? `<span class="chip chip-vip">👑 ${escapeHtml(planName)}</span>` : '<span class="chip chip-normal">Livre</span>'}
         </div>
-        <div class="guild-card-voice">
-          <span>Status: ${playingTag}</span>
-          ${callInfo}
+        <div class="guild-chips-row">
+          ${playingTag}
+          ${callChip}
         </div>
       </div>
       <div class="guild-card-footer">
-        <button class="btn ${g.isVip ? 'btn-gold' : 'btn-outline'} btn-sm w-100 btn-select-guild" data-guild-id="${escapeHtml(g.id)}">
-          🎛️ Abrir no Player
+        <button class="btn ${isVip ? 'btn-gold' : 'btn-cyan-outline'} btn-select-guild" data-guild-id="${escapeHtml(g.id)}">
+          <span>🎛️ Abrir no Player</span>
+          <svg class="btn-arrow" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42 5.43 5.43H5v2z"/></svg>
         </button>
       </div>
     `;
