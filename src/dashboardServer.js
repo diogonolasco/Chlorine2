@@ -31,11 +31,19 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
   function getBaseUrl(req) {
     let url = process.env.DASHBOARD_URL;
-    if (url && !url.includes('seu-subdominio')) {
+    if (url && !url.includes('seu-subdominio') && !url.includes('exemplo')) {
       return url.trim().replace(/\/+$/, '').replace(/\/auth\/callback$/i, '');
     }
-    const host = req.get('host') || '';
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || host.includes('shardweb.app');
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const host = (forwardedHost || req.get('host') || '').trim();
+    if (host.includes('shardweb.app')) {
+      return `https://${host}`.replace(/\/+$/, '');
+    }
+    if (host.startsWith('127.0.0.1') || host.startsWith('localhost')) {
+      const port = host.split(':')[1] || '3000';
+      return `http://localhost:${port}`;
+    }
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
     const proto = isHttps ? 'https' : 'http';
     return `${proto}://${host}`.replace(/\/+$/, '');
   }
@@ -131,7 +139,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
     const clientId = (process.env.DISCORD_CLIENT_ID || client.user?.id || '1499966080477823046').toString().trim();
     const clientSecret = (process.env.DISCORD_CLIENT_SECRET || '').toString().trim().replace(/^["']|["']$/g, '');
 
-    if (!clientSecret) {
+    if (!clientSecret || clientSecret.includes('cole_aqui') || clientSecret.includes('seu_secret')) {
       return res.status(500).send(`
         <!DOCTYPE html>
         <html lang="pt-BR">

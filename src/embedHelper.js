@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 
 // Paleta oficial da Chlorine Music™
-const EMBED_COLOR = 0x8018D8;   // Roxo Neon Chlorine
-const GOLD_COLOR = 0xFFD700;    // Dourado VIP
+const EMBED_COLOR = 0x9D4EDD;   // Roxo Neon Chlorine Oficial
+const GOLD_COLOR = 0xFFD700;    // Dourado VIP (Exclusivo para !vip e !setvip)
 const SUCCESS_COLOR = 0x10B981; // Verde Esmeralda
 const WARNING_COLOR = 0xF59E0B; // Âmbar Aviso
 const ERROR_COLOR = 0xEF4444;   // Vermelho Erro
@@ -152,11 +152,11 @@ function createPlayerEmbed({
   showLiveProgress = false,
   formatEmoji = null
 }) {
-  let title = isVip ? '👑 Tocando Agora • VIP' : 'Tocando Agora';
+  let title = 'Tocando Agora';
   if (isSkipped) {
-    title = isVip ? '👑 Pulada • Tocando Agora • VIP' : 'Pulada • Tocando Agora';
+    title = 'Pulada • Tocando Agora';
   } else if (queue?.paused) {
-    title = isVip ? '👑 Tocando Agora • VIP (Pausado)' : 'Tocando Agora (Pausado)';
+    title = 'Tocando Agora (Pausado)';
   }
 
   const playingIcon = resolveIcon(formatEmoji, 'playing', '🎵');
@@ -195,7 +195,7 @@ function createPlayerEmbed({
   const footerSummary = `Vol: ${queue?.volume ?? 100}% • Fila: ${queueCount} • Autoplay: ${queue?.autoplay ? 'ON' : 'OFF'}`;
 
   const embed = new EmbedBuilder()
-    .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
+    .setColor(EMBED_COLOR)
     .setTitle(title)
     .setDescription(body)
     .setFooter({
@@ -223,7 +223,7 @@ function createAddedSongEmbed({ queue, song, isVip = false, botUserId = null, fo
   const queuePosition = Math.max(1, (queue?.songs?.length || 2) - 1);
 
   const embed = new EmbedBuilder()
-    .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
+    .setColor(EMBED_COLOR)
     .setTitle('Adicionado à Fila')
     .setDescription(
       `${noteIcon} ${songLine}\n\n` +
@@ -252,7 +252,7 @@ function createAddedListEmbed({ queue, playlist, isVip = false, voiceChannelName
   const callPart = voiceChannelName ? ` • ${headsetIcon} **${truncateText(voiceChannelName, 24)}**` : '';
 
   const embed = new EmbedBuilder()
-    .setColor(isVip ? GOLD_COLOR : EMBED_COLOR)
+    .setColor(EMBED_COLOR)
     .setTitle('Playlist Adicionada à Fila')
     .setDescription(
       `${queueIcon} ${heading}\n\n` +

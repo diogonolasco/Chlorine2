@@ -3,25 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chlorine Music™ • Painel Web & Sistema VIP</title>
-  <link rel="icon" type="image/png" href="/assets/iconepremium.png">
+  <title>Chlorine Music™ • Painel Web Oficial</title>
+  <link rel="icon" type="image/png" href="/favicon.png?v=2.8.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.6.0">
+  <link rel="stylesheet" href="style.css?v=2.8.0">
 </head>
 <body>
-  <!-- Efeito de Fundo Luminoso Neon -->
-  <div class="bg-glow bg-glow-gold"></div>
-  <div class="bg-glow bg-glow-cyan"></div>
+  <!-- Efeito de Fundo Luminoso Neon na Cor Oficial do Bot (Roxo Neon) -->
+  <div class="bg-glow bg-glow-purple-top"></div>
+  <div class="bg-glow bg-glow-purple-bottom"></div>
 
   <!-- Barra Superior / Header -->
   <header class="navbar">
     <div class="nav-brand">
-      <img src="/assets/iconepremium.png" alt="Chlorine Music" class="brand-logo pulse-glow">
+      <img src="/bot_logo.png" alt="Chlorine Music" class="brand-logo pulse-glow">
       <div class="brand-text">
         <h1>CHLORINE MUSIC<span>™</span></h1>
-        <p>PAINEL WEB & SISTEMA VIP</p>
+        <p>PAINEL WEB OFICIAL</p>
       </div>
     </div>
 
@@ -105,7 +105,7 @@
           </select>
         </div>
         <div class="server-bar-right">
-          <span class="badge badge-cyan" id="server-voice-pill" style="display: none;">🔊 Call: --</span>
+          <span class="badge badge-purple" id="server-voice-pill" style="display: none;">🔊 Call: --</span>
           <div id="server-vip-badge">
             <span class="badge badge-normal">Carregando...</span>
           </div>
@@ -118,14 +118,14 @@
           <div class="card-header">
             <h3>🎵 Tocando Agora</h3>
             <div class="header-badges">
-              <span class="queue-status-badge badge badge-cyan" id="player-voice-badge" style="display: none;">🔊 Call: --</span>
+              <span class="queue-status-badge badge badge-purple" id="player-voice-badge" style="display: none;">🔊 Call: --</span>
               <span class="queue-status-badge badge badge-normal" id="player-status-badge">Parado</span>
             </div>
           </div>
 
           <div class="track-info-container">
             <div class="track-thumb-wrapper">
-              <img src="/assets/iconepremium.png" alt="Capa" id="track-thumb" class="track-thumb">
+              <img src="/bot_logo.png" alt="Capa" id="track-thumb" class="track-thumb">
               <div class="soundwave" id="soundwave">
                 <span></span><span></span><span></span><span></span><span></span>
               </div>
@@ -160,7 +160,7 @@
                 <button class="ctrl-btn btn-danger" id="btn-stop" title="Parar e Sair">
                   <span>⏹️</span>
                 </button>
-                <button class="ctrl-btn btn-cyan-soft" id="btn-repeat" title="Alternar Repetição (Desligado / Música / Fila)">
+                <button class="ctrl-btn btn-purple-soft" id="btn-repeat" title="Alternar Repetição (Desligado / Música / Fila)">
                   <span>🔁</span> <span id="repeat-text">Repetir: OFF</span>
                 </button>
                 <button class="ctrl-btn btn-gold" id="btn-autoplay" title="Alternar Autoplay">
@@ -318,7 +318,7 @@
             <span class="gen-title">🎉 Código VIP Gerado com Sucesso!</span>
             <div class="code-wrapper">
               <input type="text" id="generated-code-display" readonly class="code-input">
-              <button class="btn btn-cyan" id="btn-copy-code">📋 Copiar</button>
+              <button class="btn btn-primary" id="btn-copy-code">📋 Copiar</button>
             </div>
             <p class="gen-instruction">
               💡 <strong>Instrução:</strong> Vá no canal de texto do servidor onde o bot está e digite:<br>
@@ -331,7 +331,7 @@
         <div class="card vip-direct-card">
           <div class="card-header">
             <h3>⚡ Ativação Rápida Direta</h3>
-            <span class="badge badge-cyan">Sem Código</span>
+            <span class="badge badge-purple">Sem Código</span>
           </div>
           <p class="section-desc">
             Ative o VIP instantaneamente em um servidor conectado, sem precisar digitar código no chat do Discord.
@@ -435,7 +435,7 @@
               <p class="section-subtitle">Todos os servidores do Discord onde o bot está presente e pronto para tocar</p>
             </div>
           </div>
-          <span class="badge badge-cyan" id="guilds-total-badge">0 Servidores</span>
+          <span class="badge badge-purple" id="guilds-total-badge">0 Servidores</span>
         </div>
         <div class="guilds-grid" id="guilds-grid-container">
           <!-- Renderizado dinamicamente -->
@@ -449,9 +449,9 @@
   <div class="toast" id="toast">Notificação</div>
 
   <footer class="footer">
-    <p>© 2026 <strong>Chlorine Music™</strong> • Desenvolvido por <strong>.nolasco7</strong> (ID: <code>767166234117931048</code>) • <a href="https://discord.gg/6MFj275a3S" target="_blank" style="color: var(--cyan); text-decoration: none; font-weight: 600;">💬 Servidor Oficial Chlorine (discord.gg/6MFj275a3S)</a></p>
+    <p>© 2026 <strong>Chlorine Music™</strong> • Desenvolvido por <strong>.nolasco7</strong> (ID: <code>767166234117931048</code>) • <a href="https://discord.gg/6MFj275a3S" target="_blank" style="color: var(--purple-light); text-decoration: none; font-weight: 600;">💬 Servidor Oficial Chlorine (discord.gg/6MFj275a3S)</a></p>
   </footer>
 
-  <script src="app.js?v=2.6.0"></script>
+  <script src="app.js?v=2.8.0"></script>
 </body>
 </html>

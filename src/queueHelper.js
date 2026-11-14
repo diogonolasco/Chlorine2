@@ -121,8 +121,8 @@ function buildQueueMessagePayload(
   ].filter(Boolean);
 
   const embed = new EmbedBuilder()
-    .setColor(isVip ? goldColor : embedColor)
-    .setTitle(`Fila de Reprodução (${totalLabel})${isVip ? ' • VIP 👑' : ''}`)
+    .setColor(embedColor)
+    .setTitle(`Fila de Reprodução (${totalLabel})`)
     .setDescription(lines.join('\n'))
     .setFooter({
       text: footerParts.join(' • '),

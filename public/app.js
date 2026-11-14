@@ -2,7 +2,7 @@
    CHLORINE MUSIC™ • JAVASCRIPT DO PAINEL WEB & RBAC
    ============================================================== */
 
-const DEFAULT_ICON_URL = '/assets/iconepremium.png';
+const DEFAULT_ICON_URL = '/bot_logo.png';
 
 let currentGuildId = null;
 let selectedPlanId = '30d';
@@ -104,7 +104,7 @@ async function loadAuthMe() {
         roleBadge.className = 'badge badge-vip-admin';
         roleBadge.textContent = '💎 Admin VIP';
       } else if (adminGuilds.length > 0) {
-        roleBadge.className = 'badge badge-cyan';
+        roleBadge.className = 'badge badge-purple';
         roleBadge.textContent = '🛡️ Admin';
       } else {
         roleBadge.className = 'badge badge-member';
@@ -358,7 +358,7 @@ function renderGuildsGrid(guilds) {
         </div>
       </div>
       <div class="guild-card-footer">
-        <button class="btn ${isVip ? 'btn-gold' : 'btn-cyan-outline'} btn-select-guild" data-guild-id="${escapeHtml(g.id)}">
+        <button class="btn ${isVip ? 'btn-gold' : 'btn-purple-outline'} btn-select-guild" data-guild-id="${escapeHtml(g.id)}">
           <span>🎛️ Abrir no Player</span>
           <svg class="btn-arrow" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-8.29-1.42 1.42 5.43 5.43H5v2z"/></svg>
         </button>
@@ -386,12 +386,19 @@ async function loadGuildQueue(guildId, isPolling = false) {
 
     // Atualiza status VIP do servidor selecionado
     const vipBadgeContainer = document.getElementById('server-vip-badge');
+    const playerCard = document.querySelector('.now-playing-card');
+    const serverBar = document.querySelector('.server-bar');
+
     if (data.guild.isVip) {
+      if (playerCard) playerCard.classList.add('is-vip');
+      if (serverBar) serverBar.classList.add('is-vip');
       const planName = data.guild.vipInfo?.planName || 'VIP Ativo';
       const remaining = data.guild.vipInfo?.remainingFormatted || 'Ativo';
       vipBadgeContainer.innerHTML = `<span class="badge badge-gold" title="Tempo restante: ${escapeHtml(remaining)}">👑 ${escapeHtml(planName)}</span>`;
     } else {
-      vipBadgeContainer.innerHTML = '<span class="badge badge-normal">Plano Normal</span>';
+      if (playerCard) playerCard.classList.remove('is-vip');
+      if (serverBar) serverBar.classList.remove('is-vip');
+      vipBadgeContainer.innerHTML = '<span class="badge badge-purple">Servidor Conectado</span>';
     }
 
     // Atualiza badges de Call de Voz
@@ -406,7 +413,7 @@ async function loadGuildQueue(guildId, isPolling = false) {
       playerVoiceBadge.textContent = callName;
       playerVoiceBadge.style.display = 'inline-block';
       callHint.textContent = `Conectado na call: 🔊 ${data.activeVoiceChannel.name}`;
-      callHint.style.color = 'var(--cyan-primary)';
+      callHint.style.color = 'var(--purple-light)';
     } else {
       serverVoicePill.style.display = 'none';
       playerVoiceBadge.style.display = 'none';
@@ -449,7 +456,7 @@ async function loadGuildQueue(guildId, isPolling = false) {
       currentSongDurationSec = song.duration || 0;
 
       playerStatusBadge.textContent = queue.paused ? 'Pausado' : 'Tocando';
-      playerStatusBadge.className = `queue-status-badge badge ${queue.paused ? 'badge-normal' : 'badge-gold'}`;
+      playerStatusBadge.className = `queue-status-badge badge ${queue.paused ? 'badge-normal' : (data.guild?.isVip ? 'badge-gold' : 'badge-purple')}`;
 
       trackThumb.src = song.thumbnail || DEFAULT_ICON_URL;
       trackTitle.textContent = song.name;
@@ -1174,7 +1181,7 @@ async function loadVipKeysTable() {
     keys.forEach((k) => {
       const tr = document.createElement('tr');
       const statusBadge = k.used
-        ? '<span class="badge badge-cyan">🔵 Usado</span>'
+        ? '<span class="badge badge-purple">🟣 Usado</span>'
         : '<span class="badge badge-gold">🟢 Disponível</span>';
 
       const usedInfo = k.usedInGuildName

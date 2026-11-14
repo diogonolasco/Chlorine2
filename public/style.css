@@ -3,26 +3,26 @@
    ============================================================== */
 
 :root {
-  --bg-main: #07090E;
-  --bg-card: rgba(14, 18, 27, 0.75);
-  --bg-card-hover: rgba(20, 26, 38, 0.85);
-  --border-gold: rgba(255, 215, 0, 0.22);
-  --border-cyan: rgba(0, 216, 230, 0.22);
+  --bg-main: #08060D;
+  --bg-card: rgba(18, 14, 28, 0.78);
+  --bg-card-hover: rgba(26, 20, 40, 0.9);
   
+  /* Cor Oficial da Chlorine Music™ (Roxo Neon / Púrpura) */
+  --purple-primary: #9D4EDD;
+  --purple-secondary: #7B2CBF;
+  --purple-light: #C084FC;
+  --purple-glow: rgba(157, 78, 221, 0.45);
+  --border-purple: rgba(157, 78, 221, 0.28);
+
+  /* Dourado Exclusivo para Servidores VIP e Sessão VIP */
   --gold-primary: #FFD700;
   --gold-secondary: #E5B80B;
   --gold-glow: rgba(255, 215, 0, 0.45);
+  --border-gold: rgba(255, 215, 0, 0.32);
 
-  --cyan-primary: #00D8E6;
-  --cyan-secondary: #00B4D8;
-  --cyan-glow: rgba(0, 216, 230, 0.45);
-
-  --purple-primary: #A855F7;
-  --purple-glow: rgba(168, 85, 247, 0.45);
-
-  --text-primary: #F0F4F8;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  --text-primary: #F5F3FF;
+  --text-secondary: #A78BFA;
+  --text-muted: #6B7280;
 
   --danger: #EF4444;
   --danger-glow: rgba(239, 68, 68, 0.4);
@@ -30,9 +30,9 @@
 
   --font-main: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --radius-lg: 16px;
-  --radius-md: 10px;
-  --radius-sm: 6px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -57,28 +57,28 @@ body {
   line-height: 1.5;
 }
 
-/* Efeitos Luminosos de Fundo */
+/* Efeitos Luminosos de Fundo na Cor Oficial do Bot (Roxo Neon) */
 .bg-glow {
   position: fixed;
-  width: 550px;
-  height: 550px;
+  width: 580px;
+  height: 580px;
   border-radius: 50%;
-  filter: blur(140px);
+  filter: blur(150px);
   pointer-events: none;
   z-index: 0;
-  opacity: 0.18;
+  opacity: 0.22;
 }
 
-.bg-glow-gold {
+.bg-glow-purple-top {
   top: -120px;
   right: -80px;
-  background: var(--gold-primary);
+  background: var(--purple-primary);
 }
 
-.bg-glow-cyan {
+.bg-glow-purple-bottom {
   bottom: -150px;
   left: -100px;
-  background: var(--cyan-primary);
+  background: var(--purple-secondary);
 }
 
 /* ==============================================================
@@ -92,9 +92,9 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 16px 32px;
-  background: rgba(7, 9, 14, 0.85);
+  background: rgba(10, 8, 18, 0.88);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-gold);
+  border-bottom: 1px solid var(--border-purple);
 }
 
 .nav-brand {
@@ -108,38 +108,39 @@ body {
   height: 52px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--gold-primary);
-  box-shadow: 0 0 20px var(--gold-glow);
+  border: 2px solid var(--purple-primary);
+  box-shadow: 0 0 20px var(--purple-glow);
+  background: transparent;
 }
 
 .brand-text h1 {
   font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: 1px;
-  background: linear-gradient(135deg, #FFF, var(--gold-primary));
+  background: linear-gradient(135deg, #FFF, var(--purple-light));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .brand-text h1 span {
   font-size: 0.85rem;
-  color: var(--gold-primary);
+  color: var(--purple-light);
 }
 
 .brand-text p {
   font-size: 0.72rem;
   font-family: var(--font-mono);
-  color: var(--cyan-primary);
+  color: var(--purple-primary);
   letter-spacing: 1.2px;
 }
 
 .nav-tabs {
   display: flex;
   gap: 8px;
-  background: rgba(18, 24, 38, 0.7);
+  background: rgba(18, 14, 28, 0.85);
   padding: 6px;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-purple);
 }
 
 .tab-btn {
@@ -164,20 +165,27 @@ body {
 }
 
 .tab-btn.active {
-  color: #000;
-  background: linear-gradient(135deg, var(--gold-primary), #FFF5A5);
-  box-shadow: 0 0 16px var(--gold-glow);
+  color: #FFF;
+  background: linear-gradient(135deg, var(--purple-primary), var(--purple-secondary));
+  box-shadow: 0 0 16px var(--purple-glow);
   font-weight: 700;
+}
+
+.tab-btn[data-tab="my-vips"].active,
+.btn-tab-owner.active {
+  color: #000 !important;
+  background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary)) !important;
+  box-shadow: 0 0 16px var(--gold-glow) !important;
 }
 
 .bot-badge {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(18, 24, 38, 0.9);
+  background: rgba(18, 14, 28, 0.9);
   padding: 8px 16px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-cyan);
+  border: 1px solid var(--border-purple);
 }
 
 .status-dot {
@@ -203,7 +211,7 @@ body {
 .bot-ping {
   font-size: 0.72rem;
   font-family: var(--font-mono);
-  color: var(--cyan-primary);
+  color: var(--purple-light);
 }
 
 /* ==============================================================
@@ -233,7 +241,7 @@ body {
   max-width: 100%;
   background: var(--bg-card);
   backdrop-filter: blur(14px);
-  border: 1px solid var(--border-gold);
+  border: 1px solid var(--border-purple);
   border-radius: var(--radius-lg);
   padding: 20px 22px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
@@ -241,7 +249,7 @@ body {
 }
 
 .card:hover {
-  border-color: rgba(255, 215, 0, 0.4);
+  border-color: rgba(157, 78, 221, 0.45);
 }
 
 .card-header {
@@ -292,10 +300,11 @@ body {
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.15);
 }
 
-.badge-cyan {
-  background: rgba(0, 216, 230, 0.15);
-  color: var(--cyan-primary);
-  border: 1px solid var(--border-cyan);
+.badge-cyan,
+.badge-purple {
+  background: rgba(157, 78, 221, 0.15);
+  color: var(--purple-light);
+  border: 1px solid var(--border-purple);
 }
 
 .badge-normal {
@@ -371,19 +380,41 @@ body {
 
 .track-thumb-wrapper {
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: 140px;
+  height: 140px;
   flex-shrink: 0;
-  border-radius: var(--radius-md);
+  border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--border-gold);
-  box-shadow: 0 0 24px var(--gold-glow);
+  border: 3px solid var(--purple-primary);
+  box-shadow: 0 0 24px var(--purple-glow);
+  background: transparent;
 }
 
 .track-thumb {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
+  background: transparent;
+}
+
+/* Quando o servidor selecionado for VIP, recebe o destaque dourado VIP */
+.now-playing-card.is-vip .track-thumb-wrapper {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 28px var(--gold-glow);
+}
+
+.now-playing-card.is-vip .soundwave span {
+  background: var(--gold-primary);
+}
+
+.now-playing-card.is-vip .progress-fill {
+  background: linear-gradient(90deg, var(--gold-secondary), var(--gold-primary));
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
+.now-playing-card.is-vip .custom-slider {
+  accent-color: var(--gold-primary);
 }
 
 .soundwave {
@@ -399,7 +430,7 @@ body {
 .soundwave span {
   width: 4px;
   height: 100%;
-  background: var(--gold-primary);
+  background: var(--purple-primary);
   border-radius: 2px;
   animation: bounce 1.2s infinite ease-in-out;
 }
@@ -458,8 +489,8 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--cyan-primary), var(--gold-primary));
-  box-shadow: 0 0 10px var(--gold-glow);
+  background: linear-gradient(90deg, var(--purple-secondary), var(--purple-primary), var(--purple-light));
+  box-shadow: 0 0 10px var(--purple-glow);
   transition: width 0.3s ease;
 }
 
@@ -497,7 +528,8 @@ body {
 }
 
 .ctrl-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(157, 78, 221, 0.22);
+  border-color: var(--purple-primary);
   transform: translateY(-2px);
 }
 
@@ -534,18 +566,18 @@ body {
 }
 
 .ctrl-btn.btn-cyan-soft {
-  background: rgba(0, 216, 230, 0.12);
-  border-color: var(--border-cyan);
-  color: var(--cyan-primary);
+  background: rgba(157, 78, 221, 0.12);
+  border-color: var(--border-purple);
+  color: var(--purple-light);
   font-size: 0.84rem;
   font-weight: 700;
 }
 
 .ctrl-btn.btn-cyan-soft.active,
 .ctrl-btn.btn-cyan-soft:hover {
-  background: var(--cyan-primary);
-  color: #000;
-  box-shadow: 0 0 15px var(--cyan-glow);
+  background: var(--purple-primary);
+  color: #FFF;
+  box-shadow: 0 0 15px var(--purple-glow);
 }
 
 .volume-control {
@@ -559,17 +591,17 @@ body {
 .custom-slider {
   flex: 1;
   min-width: 0;
-  accent-color: var(--gold-primary);
-  height: 5px;
+  accent-color: var(--purple-primary);
+  height: 6px;
   cursor: pointer;
 }
 
 /* Tocar Música & Mover Call pelo Painel */
 .quick-play-box {
-  background: rgba(10, 14, 22, 0.8);
+  background: rgba(18, 14, 28, 0.85);
   padding: 16px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-purple);
 }
 
 .quick-play-header {
@@ -584,14 +616,14 @@ body {
 .quick-play-box h4 {
   font-size: 0.88rem;
   font-weight: 700;
-  color: var(--cyan-primary);
+  color: var(--purple-light);
   margin: 0;
 }
 
 .owner-hint {
   font-size: 0.76rem;
   font-family: var(--font-mono);
-  color: var(--gold-primary);
+  color: var(--purple-light);
 }
 
 .quick-play-form {
@@ -624,13 +656,14 @@ body {
 
 .btn-voice-move {
   white-space: nowrap;
-  border-color: var(--border-cyan);
-  color: var(--cyan-primary);
+  border-color: var(--border-purple);
+  color: var(--purple-light);
 }
 
 .btn-voice-move:hover {
-  background: rgba(0, 216, 230, 0.16);
+  background: rgba(157, 78, 221, 0.2);
   color: #FFF;
+  box-shadow: 0 0 12px var(--purple-glow);
 }
 
 /* Fila de Músicas Editável */
@@ -705,8 +738,8 @@ body {
 }
 
 .queue-item.drag-over {
-  border-color: var(--cyan-primary);
-  box-shadow: 0 0 12px var(--cyan-glow);
+  border-color: var(--purple-primary);
+  box-shadow: 0 0 12px var(--purple-glow);
 }
 
 .queue-item:hover {
@@ -764,7 +797,7 @@ body {
 .queue-duration {
   font-size: 0.72rem;
   font-family: var(--font-mono);
-  color: var(--cyan-primary);
+  color: var(--purple-light);
   flex-shrink: 0;
 }
 
@@ -791,8 +824,8 @@ body {
 }
 
 .q-act-btn:hover:not(:disabled) {
-  background: rgba(0, 216, 230, 0.25);
-  border-color: var(--cyan-primary);
+  background: rgba(157, 78, 221, 0.3);
+  border-color: var(--purple-primary);
   color: #FFF;
 }
 
@@ -982,7 +1015,7 @@ body {
   background: #000;
   padding: 3px 8px;
   border-radius: 4px;
-  color: var(--cyan-primary);
+  color: var(--purple-light);
   font-family: var(--font-mono);
 }
 
@@ -1080,15 +1113,15 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, var(--cyan-primary), transparent);
-  opacity: 0.5;
+  background: linear-gradient(90deg, transparent, var(--purple-primary), transparent);
+  opacity: 0.6;
   transition: var(--transition);
 }
 
 .guild-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(0, 216, 230, 0.45);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 24px var(--cyan-glow);
+  border-color: var(--purple-primary);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 24px var(--purple-glow);
 }
 
 .guild-card:hover::before {
@@ -1138,7 +1171,7 @@ body {
 }
 
 .guild-card:hover .guild-card-icon {
-  border-color: var(--cyan-primary);
+  border-color: var(--purple-primary);
 }
 
 .guild-card.guild-card-vip .guild-card-icon {
@@ -1268,9 +1301,9 @@ body {
 }
 
 .chip-voice.active {
-  background: rgba(0, 216, 230, 0.12);
-  color: #00D8E6;
-  border: 1px solid rgba(0, 216, 230, 0.35);
+  background: rgba(157, 78, 221, 0.15);
+  color: var(--purple-light);
+  border: 1px solid var(--border-purple);
 }
 
 .chip-time {
@@ -1312,16 +1345,18 @@ body {
   transform: translateY(-2px);
 }
 
-.btn-cyan-outline {
-  background: rgba(0, 216, 230, 0.08);
-  border: 1px solid rgba(0, 216, 230, 0.4) !important;
-  color: #00D8E6 !important;
+.btn-cyan-outline,
+.btn-purple-outline {
+  background: rgba(157, 78, 221, 0.1);
+  border: 1px solid var(--border-purple) !important;
+  color: var(--purple-light) !important;
 }
 
-.btn-cyan-outline:hover {
-  background: var(--cyan-primary) !important;
-  color: #000 !important;
-  box-shadow: 0 0 20px var(--cyan-glow);
+.btn-cyan-outline:hover,
+.btn-purple-outline:hover {
+  background: var(--purple-primary) !important;
+  color: #FFF !important;
+  box-shadow: 0 0 20px var(--purple-glow);
   transform: translateY(-2px);
 }
 
@@ -1387,9 +1422,15 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--cyan-primary), #0099AA);
-  color: #000;
-  box-shadow: 0 0 16px var(--cyan-glow);
+  background: linear-gradient(135deg, var(--purple-primary), var(--purple-secondary));
+  color: #FFF;
+  box-shadow: 0 0 16px var(--purple-glow);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--purple-light), var(--purple-primary));
+  box-shadow: 0 0 24px var(--purple-glow);
+  transform: translateY(-2px);
 }
 
 .btn-gold {
@@ -1402,9 +1443,10 @@ body {
   background: linear-gradient(135deg, #FFF, var(--gold-primary));
 }
 
-.btn-cyan {
-  background: var(--cyan-primary);
-  color: #000;
+.btn-cyan,
+.btn-purple {
+  background: var(--purple-primary);
+  color: #FFF;
 }
 
 .btn-outline {
@@ -1807,6 +1849,7 @@ body {
   }
 
   .ctrl-btn.btn-cyan-soft,
+  .ctrl-btn.btn-purple-soft,
   .ctrl-btn.btn-gold {
     flex: 1 1 calc(50% - 6px);
     justify-content: center;
