@@ -12,3 +12,7 @@ npm-debug.log*
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Pacotes de upload manual para ShardCloud
+upload_shardcloud/
+*.zip
