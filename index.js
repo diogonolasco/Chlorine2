@@ -120,7 +120,9 @@ function renderBoxLine(label, value, totalWidth = 56) {
 
 // Quando o bot estiver online
 client.once('clientReady', async () => {
-  const dashboardPort = process.env.PORT || 3000;
+  const defaultPort = process.platform === 'linux' ? 80 : 3000;
+  const dashboardPort = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
+  const dashboardDisplayUrl = process.env.DASHBOARD_URL || (dashboardPort === 80 ? 'http://localhost' : `http://localhost:${dashboardPort}`);
   console.clear();
   const c = colors;
   console.log(c.purple + '  ██████╗██╗  ██╗██╗      ██████╗ ██████╗ ██╗███╗   ██╗███████╗' + c.reset);
@@ -139,12 +141,12 @@ client.once('clientReady', async () => {
   console.log(renderBoxLine(c.yellow + '🌍 Servidores:' + c.reset, c.green + `${client.guilds.cache.size} servidores conectados` + c.reset));
   console.log(renderBoxLine(c.yellow + '⚡ Ping:' + c.reset, c.white + `${client.ws.ping}ms` + c.reset));
   console.log(renderBoxLine(c.yellow + '🎶 Prefixo:' + c.reset, c.white + PREFIX + ' e /' + c.reset));
-  console.log(renderBoxLine(c.yellow + '🌐 Painel Web:' + c.reset, c.purple + `http://localhost:${dashboardPort}` + c.reset));
+  console.log(renderBoxLine(c.yellow + '🌐 Painel Web:' + c.reset, c.purple + dashboardDisplayUrl + c.reset));
   console.log(renderBoxLine(c.yellow + '🟢 Status:' + c.reset, c.green + 'Online & Pronto para tocar!' + c.reset));
   console.log(c.purple + '  ╚══════════════════════════════════════════════════════════════╝' + c.reset);
   console.log('');
 
-  // Inicia o Painel Web Localhost
+  // Inicia o Painel Web (com suporte a porta 80 na nuvem e porta 3000 local)
   try {
     createDashboardServer(client, distube, dashboardPort, { quiet: true });
   } catch (err) {

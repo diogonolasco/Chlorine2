@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chlorine Music™ • Painel de Controle & Sistema VIP</title>
+  <title>Chlorine Music™ • Painel Web & Sistema VIP</title>
   <link rel="icon" type="image/png" href="/assets/iconepremium.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,35 +21,76 @@
       <img src="/assets/iconepremium.png" alt="Chlorine Music" class="brand-logo pulse-glow">
       <div class="brand-text">
         <h1>CHLORINE MUSIC<span>™</span></h1>
-        <p>PAINEL DE CONTROLE LOCALHOST & SISTEMA VIP</p>
+        <p>PAINEL WEB & SISTEMA VIP</p>
       </div>
     </div>
 
     <!-- Navegação de Abas -->
-    <nav class="nav-tabs">
+    <nav class="nav-tabs" id="main-nav-tabs">
       <button class="tab-btn active" data-tab="player">
         <span class="icon">🎛️</span> Player & Músicas
       </button>
-      <button class="tab-btn" data-tab="vip">
-        <span class="icon">👑</span> Sistema VIP
+      <button class="tab-btn" data-tab="my-vips" id="tab-btn-my-vips" style="display: none;">
+        <span class="icon">💎</span> Meus Servidores VIP (<span id="nav-my-vips-count">0</span>)
+      </button>
+      <button class="tab-btn btn-tab-owner" data-tab="vip" id="tab-btn-owner-vip" style="display: none;">
+        <span class="icon">👑</span> Painel Owner (VIP)
       </button>
       <button class="tab-btn" data-tab="guilds">
         <span class="icon">🌍</span> Servidores (<span id="nav-guilds-count">0</span>)
       </button>
     </nav>
 
-    <!-- Indicador de Status do Bot -->
-    <div class="bot-badge" id="bot-badge">
-      <span class="status-dot"></span>
-      <div class="bot-info">
-        <span class="bot-name" id="bot-tag">Carregando...</span>
-        <span class="bot-ping" id="bot-ping">Ping: --ms</span>
+    <!-- Área de Status e Login no Topo -->
+    <div class="nav-right">
+      <!-- Indicador de Status do Bot -->
+      <div class="bot-badge" id="bot-badge">
+        <span class="status-dot"></span>
+        <div class="bot-info">
+          <span class="bot-name" id="bot-tag">Carregando...</span>
+          <span class="bot-ping" id="bot-ping">Ping: --ms</span>
+        </div>
+      </div>
+
+      <!-- Componente de Autenticação Discord -->
+      <div class="auth-box" id="auth-box">
+        <!-- Botão Login (Visitante) -->
+        <a href="/auth/discord" class="btn btn-discord" id="btn-login-discord">
+          <svg class="discord-icon" viewBox="0 0 127.14 96.36">
+            <path fill="currentColor" d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.86,53,48.83,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
+          </svg>
+          <span>Entrar com Discord</span>
+        </a>
+
+        <!-- Perfil do Usuário Logado -->
+        <div class="user-badge" id="user-profile-badge" style="display: none;">
+          <img src="" alt="Avatar" id="user-avatar" class="user-avatar">
+          <div class="user-details">
+            <span class="user-name" id="user-name">Carregando...</span>
+            <span class="badge badge-normal" id="user-role-badge">Membro</span>
+          </div>
+          <a href="/auth/logout" class="btn btn-sm btn-logout" title="Sair da conta">Sair</a>
+        </div>
       </div>
     </div>
   </header>
 
   <!-- Container Principal -->
   <main class="container">
+
+    <!-- Banner Informativo de Boas-Vindas (Quando deslogado) -->
+    <div class="card auth-banner-card" id="auth-banner-card" style="display: none;">
+      <div class="auth-banner-content">
+        <div class="auth-banner-icon">🌐</div>
+        <div class="auth-banner-text">
+          <h3>Bem-vindo ao Painel Web Oficial do Chlorine Music™!</h3>
+          <p>Faça login com a sua conta do Discord para gerenciar os comandos do player nos servidores em que você é <strong>Administrador</strong> e aproveitar os recursos VIP!</p>
+        </div>
+      </div>
+      <a href="/auth/discord" class="btn btn-discord">
+        <span>Conectar com Discord</span>
+      </a>
+    </div>
 
     <!-- ============================================== -->
     <!-- ABA 1: PLAYER & CONTROLE DE MÚSICA -->
@@ -105,7 +146,7 @@
                 </div>
               </div>
 
-              <!-- Controles Interativos Completos (Owner) -->
+              <!-- Controles Interativos -->
               <div class="player-controls">
                 <button class="ctrl-btn" id="btn-previous" title="Voltar Música Anterior">
                   <span>⏮️</span>
@@ -163,7 +204,7 @@
           </div>
         </div>
 
-        <!-- Fila de Reprodução Editável (Owner) -->
+        <!-- Fila de Reprodução Editável -->
         <div class="card queue-card">
           <div class="card-header queue-card-header">
             <h3>📜 Fila (<span id="queue-count">0</span>)</h3>
@@ -185,23 +226,57 @@
     </section>
 
     <!-- ============================================== -->
-    <!-- ABA 2: SISTEMA VIP -->
+    <!-- ABA 2: MEUS SERVIDORES VIP (ADMINS) -->
+    <!-- ============================================== -->
+    <section class="tab-content" id="tab-my-vips">
+      <div class="card vip-banner-card">
+        <img src="/assets/iconepremium.png" alt="VIP" class="vip-banner-img pulse-glow">
+        <div class="vip-banner-content">
+          <h2>💎 SEUS SERVIDORES COM STATUS VIP</h2>
+          <p>
+            Aqui estão os servidores onde você possui permissão de <strong>Administrador</strong> e o bot Chlorine Music™ possui <strong>Plano VIP Ativo</strong>.
+          </p>
+          <div class="vip-perks-pills">
+            <span class="pill-gold">📻 Autoplay Liberado</span>
+            <span class="pill-gold">🔊 Volume até 200%</span>
+            <span class="pill-gold">⏭️ Skip Ilimitado</span>
+            <span class="pill-gold">⚡ Prioridade HD</span>
+            <span class="pill-gold">👑 Embed Dourado</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-20">
+        <div class="card-header">
+          <h3>👑 Servidores VIP que Você Administra</h3>
+          <span class="badge badge-gold" id="my-vips-badge">0 Servidores</span>
+        </div>
+        <p class="section-desc">Clique no botão "Controlar no Player" para gerenciar as músicas e funções do bot no servidor selecionado.</p>
+        <div class="guilds-grid" id="my-vips-grid">
+          <!-- Renderizado dinamicamente -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- ABA 3: PAINEL OWNER (SISTEMA VIP & CHAVES) -->
+    <!-- EXCLUSIVO PARA O DONO DO BOT (ID 767166234117931048) -->
     <!-- ============================================== -->
     <section class="tab-content" id="tab-vip">
       <!-- Top Banner Dourado VIP -->
       <div class="vip-banner-card card">
         <img src="/assets/iconepremium.png" alt="Chlorine VIP" class="vip-banner-img pulse-glow">
         <div class="vip-banner-content">
-          <h2>👑 SISTEMA VIP CHLORINE MUSIC™</h2>
+          <h2>👑 PAINEL OWNER • GERENCIADOR DE CHAVES VIP</h2>
           <p>
-            Gere códigos de ativação únicos para seus clientes, ative o VIP diretamente em qualquer servidor conectado ou gerencie o tempo de duração restante.
+            Área de acesso restrito ao Dono do Bot (<code>.nolasco7</code> • ID: <code>767166234117931048</code>).
+            Aqui você pode gerar novos códigos de ativação para seus clientes ou ativar VIP diretamente em servidores.
           </p>
           <div class="vip-perks-pills">
-            <span class="pill-gold">📻 Autoplay Automático</span>
-            <span class="pill-gold">🔊 Volume até 200%</span>
-            <span class="pill-gold">⏭️ Skip Ilimitado</span>
-            <span class="pill-gold">⚡ Buffer de Áudio HD Prioritário</span>
-            <span class="pill-gold">👑 Embed Dourado Exclusivo</span>
+            <span class="pill-gold">🔐 Gerador Protegido</span>
+            <span class="pill-gold">🔑 Chaves Criptografadas</span>
+            <span class="pill-gold">⚡ Ativação Direta</span>
+            <span class="pill-gold">🗑️ Revogação Instantânea</span>
           </div>
         </div>
       </div>
@@ -343,7 +418,7 @@
     </section>
 
     <!-- ============================================== -->
-    <!-- ABA 3: SERVIDORES CONECTADOS -->
+    <!-- ABA 4: SERVIDORES CONECTADOS -->
     <!-- ============================================== -->
     <section class="tab-content" id="tab-guilds">
       <div class="card">

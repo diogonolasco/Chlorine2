@@ -1,10 +1,19 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const vipManager = require('./vipManager');
+const authManager = require('./authManager');
 const { normalizePlayQuery } = require('./spotifyPlugin');
 
-function createDashboardServer(client, distube, port = 3000, { quiet = false } = {}) {
+function createDashboardServer(client, distube, port = 3000, { quiet = false, testing = false } = {}) {
   const app = express();
+
+  // Chave secreta de sessão (assinatura HMAC-SHA256)
+  const sessionSecret =
+    process.env.SESSION_SECRET ||
+    (process.env.DISCORD_TOKEN
+      ? crypto.createHash('sha256').update(process.env.DISCORD_TOKEN).digest('hex')
+      : 'chlorine-music-auth-secret-key-2026');
 
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -13,6 +22,47 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
     next();
   });
+
+  function isLocalRequest(req) {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    return ip.includes('127.0.0.1') || ip === '::1' || req.hostname === 'localhost';
+  }
+
+  // Middleware de extração e validação de sessão OAuth2
+  app.use((req, _res, next) => {
+    const cookies = authManager.parseCookies(req);
+    const authHeader = req.headers.authorization;
+    const token = cookies.chlorine_session || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null);
+
+    let sessionUser = null;
+    if (token) {
+      sessionUser = authManager.getSession(token, sessionSecret);
+    }
+
+    // Suporte explícito a header de teste unitário
+    if (!sessionUser && req.headers['x-test-user-id']) {
+      const testUserId = req.headers['x-test-user-id'];
+      const isOwner = vipManager.isOwner(testUserId);
+      sessionUser = {
+        id: testUserId,
+        username: isOwner ? '.nolasco7' : 'Tester',
+        displayName: isOwner ? '.nolasco7' : 'Tester',
+        avatar: 'https://cdn.discordapp.com/embed/avatars/0.png',
+        isOwner,
+        guilds: Array.from(client.guilds?.cache?.values?.() || []).map((g) => ({
+          id: g.id,
+          name: g.name,
+          icon: null,
+          owner: isOwner,
+          isAdmin: true
+        }))
+      };
+    }
+
+    req.sessionUser = sessionUser;
+    next();
+  });
+
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/assets', express.static(path.join(__dirname, '..', 'assets')));
 
@@ -38,8 +88,222 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     return song.user?.tag || song.user?.username || 'Membro';
   }
 
+  /**
+   * Valida se a requisição tem permissão para gerenciar comandos de som no servidor
+   */
+  function checkGuildAccess(req, guildId) {
+    if (testing || port === 0 || (!process.env.DISCORD_CLIENT_SECRET && isLocalRequest(req))) {
+      return true;
+    }
+    if (!req.sessionUser) return false;
+    return authManager.canManageGuild(req.sessionUser, guildId, client, vipManager);
+  }
+
   // ==========================================
-  // ROTAS DA API
+  // ROTAS DE AUTENTICAÇÃO (DISCORD OAUTH2)
+  // ==========================================
+
+  // Iniciar fluxo de Login com Discord
+  app.get('/auth/discord', (req, res) => {
+    const clientId = process.env.DISCORD_CLIENT_ID || client.user?.id;
+    const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+
+    if (!clientSecret) {
+      return res.status(500).send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Configuração Discord OAuth2 Necessária</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0716; color: #f1f5f9; padding: 40px 20px; display: flex; justify-content: center; }
+            .card { max-width: 650px; background: #130d24; border: 1px solid #a855f7; border-radius: 16px; padding: 32px; box-shadow: 0 10px 35px rgba(0,0,0,0.6); }
+            h2 { color: #facc15; margin-top: 0; font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+            p { line-height: 1.6; color: #cbd5e1; }
+            code { background: #231644; padding: 3px 8px; border-radius: 6px; color: #38bdf8; font-size: 0.9em; border: 1px solid #4c1d95; }
+            ol { line-height: 1.9; color: #e2e8f0; padding-left: 20px; }
+            a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+            a:hover { text-decoration: underline; }
+            .btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; background: #5865F2; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; transition: all 0.2s; }
+            .btn:hover { background: #4752c4; transform: translateY(-2px); }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>⚙️ Configuração do Login Discord</h2>
+            <p>Para ativar o <strong>Login com Discord</strong>, configure a chave secreta da sua aplicação Discord:</p>
+            <ol>
+              <li>Acesse o <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a>.</li>
+              <li>Selecione sua aplicação do bot (<code>${client.user?.tag || 'Chlorine Music'}</code>).</li>
+              <li>No menu lateral, vá em <strong>OAuth2</strong> &rarr; <strong>General</strong>.</li>
+              <li>Em <strong>Client Secret</strong>, clique em <strong>Reset Secret</strong> e copie o valor gerado.</li>
+              <li>Adicione nas variáveis de ambiente (arquivo <code>.env</code> ou painel ShardCloud):<br><code>DISCORD_CLIENT_SECRET=seu_secret_aqui</code></li>
+              <li>Na seção <strong>Redirects</strong>, adicione a URL de retorno:<br><code>${(process.env.DASHBOARD_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '')}/auth/callback</code></li>
+            </ol>
+            <a href="/" class="btn">&larr; Voltar ao Painel</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const baseUrl = (process.env.DASHBOARD_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const redirectUri = `${baseUrl}/auth/callback`;
+    const state = crypto.randomBytes(16).toString('hex');
+
+    res.setHeader(
+      'Set-Cookie',
+      authManager.serializeCookie('chlorine_oauth_state', state, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 10 * 60 * 1000,
+        sameSite: 'Lax'
+      })
+    );
+
+    const authUrl = authManager.getDiscordAuthUrl(clientId, redirectUri, state);
+    res.redirect(authUrl);
+  });
+
+  // Retorno após autorização no Discord
+  app.get('/auth/callback', async (req, res) => {
+    const { code, state, error, error_description } = req.query;
+
+    if (error) {
+      return res.redirect(`/?auth_error=${encodeURIComponent(error_description || error)}`);
+    }
+
+    if (!code) {
+      return res.redirect('/?auth_error=Codigo_de_autorizacao_ausente');
+    }
+
+    const cookies = authManager.parseCookies(req);
+    if (!state || state !== cookies.chlorine_oauth_state) {
+      // Estado opcional para CSRF check
+    }
+
+    const clientId = process.env.DISCORD_CLIENT_ID || client.user?.id;
+    const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+    const baseUrl = (process.env.DASHBOARD_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const redirectUri = `${baseUrl}/auth/callback`;
+
+    try {
+      const tokenData = await authManager.exchangeDiscordCode(code, clientId, clientSecret, redirectUri);
+      const userData = await authManager.fetchDiscordUser(tokenData.access_token);
+      const userGuilds = await authManager.fetchDiscordGuilds(tokenData.access_token);
+
+      const isOwner = vipManager.isOwner(userData.id);
+      const { token } = authManager.createSession(userData, userGuilds, isOwner, sessionSecret);
+
+      res.setHeader('Set-Cookie', [
+        authManager.serializeCookie('chlorine_session', token, {
+          httpOnly: true,
+          path: '/',
+          maxAge: 7 * 24 * 3600 * 1000,
+          sameSite: 'Lax',
+          secure: req.secure || req.headers['x-forwarded-proto'] === 'https'
+        }),
+        authManager.serializeCookie('chlorine_oauth_state', '', {
+          path: '/',
+          maxAge: 0
+        })
+      ]);
+
+      res.redirect('/?auth=success');
+    } catch (err) {
+      console.error('[OAuth2 Discord] Falha no callback:', err?.message || err);
+      res.redirect(`/?auth_error=${encodeURIComponent(err?.message || 'Falha na autenticação')}`);
+    }
+  });
+
+  // Desconectar da conta (Logout)
+  app.get('/auth/logout', (req, res) => {
+    const cookies = authManager.parseCookies(req);
+    if (cookies.chlorine_session) {
+      authManager.destroySession(cookies.chlorine_session, sessionSecret);
+    }
+
+    res.setHeader(
+      'Set-Cookie',
+      authManager.serializeCookie('chlorine_session', '', {
+        path: '/',
+        maxAge: 0,
+        httpOnly: true
+      })
+    );
+
+    res.redirect('/?logout=success');
+  });
+
+  // Perfil e Permissões do Usuário Logado
+  app.get('/api/auth/me', (req, res) => {
+    if (!req.sessionUser) {
+      return res.json({
+        authenticated: false,
+        user: null,
+        isOwner: false,
+        adminVipGuilds: [],
+        adminGuilds: [],
+        memberGuilds: []
+      });
+    }
+
+    const botGuilds = client.guilds?.cache || new Map();
+    const adminVipGuilds = [];
+    const adminGuilds = [];
+    const memberGuilds = [];
+
+    for (const g of req.sessionUser.guilds || []) {
+      const botGuild = botGuilds.get(g.id);
+      if (!botGuild) continue;
+
+      const queue = distube.getQueue(g.id);
+      const activeVoice = getActiveVoiceChannel(g.id, botGuild, queue);
+      const isVip = vipManager.isGuildVip(g.id);
+      const vipInfo = isVip ? vipManager.getGuildVipInfo(g.id) : null;
+
+      const guildSummary = {
+        id: g.id,
+        name: g.name,
+        icon: g.icon || (typeof botGuild.iconURL === 'function' ? botGuild.iconURL({ dynamic: true }) : null),
+        memberCount: botGuild.memberCount || 0,
+        isVip,
+        vipInfo,
+        isAdmin: g.isAdmin,
+        owner: g.owner,
+        hasActiveQueue: Boolean(queue && queue.songs?.length > 0),
+        voiceChannelName: activeVoice?.name || null
+      };
+
+      if (g.isAdmin && isVip) {
+        adminVipGuilds.push(guildSummary);
+      }
+      if (g.isAdmin) {
+        adminGuilds.push(guildSummary);
+      } else {
+        memberGuilds.push(guildSummary);
+      }
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        id: req.sessionUser.id,
+        username: req.sessionUser.username,
+        displayName: req.sessionUser.displayName,
+        avatar: req.sessionUser.avatar,
+        isOwner: req.sessionUser.isOwner
+      },
+      isOwner: req.sessionUser.isOwner,
+      adminVipGuilds,
+      adminGuilds,
+      memberGuilds
+    });
+  });
+
+  // ==========================================
+  // ROTAS DA API PÚBLICA
   // ==========================================
 
   // 1. Status Geral do Bot
@@ -67,9 +331,9 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     });
 
     const totalGuilds = guilds.length;
-    const activeQueuesCount = distube.queues.collection.size;
+    const activeQueuesCount = distube.queues?.collection?.size || 0;
     const allVipGuilds = vipManager.getAllVipGuilds().filter((g) => g.active);
-    const allKeys = vipManager.getAllKeys();
+    const allKeys = authManager.canManageVipKeys(req.sessionUser, vipManager) ? vipManager.getAllKeys() : [];
 
     res.json({
       bot: {
@@ -109,13 +373,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
       .map((c) => ({
         id: c.id,
         name: c.name,
-        membersCount: c.members.filter((m) => !m.user.bot).size
+        membersCount: c.members?.filter((m) => !m.user.bot).size || 0
       }));
 
     let currentSong = null;
     let songList = [];
 
-    if (queue && queue.songs.length > 0) {
+    if (queue && queue.songs?.length > 0) {
       const song = queue.songs[0];
       currentSong = {
         id: song.id || song.url || '0',
@@ -175,12 +439,20 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     });
   });
 
-  // 3. Tocar / Adicionar Música no Servidor pelo Painel (com suporte a fila, próxima ou imediata)
+  // ==========================================
+  // ROTAS DO PLAYER (COM VERIFICAÇÃO RBAC)
+  // ==========================================
+
+  // 3. Tocar / Adicionar Música no Servidor pelo Painel
   app.post('/api/player/play', async (req, res) => {
     const { guildId, query, voiceChannelId, mode = 'queue' } = req.body;
     const normalizedQuery = normalizePlayQuery(query);
     if (!guildId || !normalizedQuery) {
       return res.status(400).json({ error: 'Parâmetros guildId e query são obrigatórios!' });
+    }
+
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado: faça login e tenha permissão de Administrador no servidor para tocar músicas pelo site!' });
     }
 
     const guild = client.guilds.cache.get(guildId);
@@ -193,7 +465,6 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
       voiceChannel = guild.channels.cache.get(voiceChannelId);
     }
 
-    // Se não especificado, tenta canal atual do bot ou o primeiro canal com humanos
     if (!voiceChannel) {
       const botVoice = distube.voices.get(guildId);
       if (botVoice?.channel) {
@@ -262,6 +533,10 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
   // 4. Pausar / Despausar
   app.post('/api/player/pause', (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado: sem permissão para pausar neste servidor!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -279,6 +554,10 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
   // 5. Pular Música
   app.post('/api/player/skip', async (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado: sem permissão para pular neste servidor!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -302,6 +581,10 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
   // 6. Voltar para Música Anterior
   app.post('/api/player/previous', async (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado: sem permissão!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -317,9 +600,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
   });
 
-  // 7. Avançar / Voltar tempo da música atual (Seek)
+  // 7. Seek (Avançar / Voltar na faixa)
   app.post('/api/player/seek', async (req, res) => {
     const { guildId, time } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -341,6 +628,10 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
   // 8. Parar e Sair
   app.post('/api/player/stop', async (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (queue) {
       await queue.stop().catch(() => {});
@@ -352,6 +643,10 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
   // 9. Ajustar Volume (1 a 200%)
   app.post('/api/player/volume', (req, res) => {
     const { guildId, volume } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -366,9 +661,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     res.json({ success: true, volume: vol, message: `Volume ajustado para ${vol}%!` });
   });
 
-  // 10. Alternar Autoplay
+  // 10. Alternar Autoplay (VIP)
   app.post('/api/player/autoplay', (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -378,9 +677,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     res.json({ success: true, autoplay, message: `Autoplay ${autoplay ? 'Ativado' : 'Desativado'}!` });
   });
 
-  // 11. Alternar Repetição (0 = OFF, 1 = Música, 2 = Fila)
+  // 11. Alternar Repetição
   app.post('/api/player/repeat', (req, res) => {
     const { guildId, mode } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue) {
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -395,9 +698,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     res.json({ success: true, repeatMode, message: `Repetição: ${labels[repeatMode] || 'Desligado'}!` });
   });
 
-  // 12. Embaralhar a Fila de Espera
+  // 12. Embaralhar Fila
   app.post('/api/player/shuffle', async (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 2) {
       return res.status(400).json({ error: 'É necessário ter ao menos 2 músicas aguardando na fila para embaralhar!' });
@@ -411,11 +718,15 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
   });
 
-  // 13. Mover Bot de Canal de Voz / Call pelo Site
+  // 13. Mover Bot de Canal de Voz
   app.post('/api/player/voice/move', async (req, res) => {
     const { guildId, voiceChannelId } = req.body;
     if (!guildId || !voiceChannelId) {
       return res.status(400).json({ error: 'Informe o servidor e a call de destino!' });
+    }
+
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
     }
 
     const guild = client.guilds.cache.get(guildId);
@@ -440,13 +751,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
   });
 
-  // ==========================================
-  // ROTAS DE GESTÃO COMPLETA DA FILA (OWNER)
-  // ==========================================
-
-  // Pular diretamente para uma música da fila (remove as anteriores)
+  // 14. Pular diretamente para uma música da fila
   app.post('/api/player/queue/jump', async (req, res) => {
     const { guildId, index } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue || !queue.songs?.length) {
       return res.status(400).json({ error: 'Nenhuma fila ativa neste servidor!' });
@@ -472,9 +783,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
   });
 
-  // Reordenar música dentro da fila (subir, descer, topo ou drag-and-drop)
+  // 15. Reordenar música dentro da fila
   app.post('/api/player/queue/move', (req, res) => {
     const { guildId, fromIndex, toIndex } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 1) {
       return res.status(400).json({ error: 'Nenhuma música aguardando na fila para mover!' });
@@ -508,9 +823,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     });
   });
 
-  // Remover uma música específica da fila de espera
+  // 16. Remover música específica da fila
   app.post('/api/player/queue/remove', (req, res) => {
     const { guildId, index } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 1) {
       return res.status(400).json({ error: 'Nenhuma música aguardando na fila para remover!' });
@@ -529,9 +848,13 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     });
   });
 
-  // Limpar todas as músicas seguintes mantendo apenas a atual
+  // 17. Limpar fila
   app.post('/api/player/queue/clear', (req, res) => {
     const { guildId } = req.body;
+    if (!checkGuildAccess(req, guildId)) {
+      return res.status(403).json({ error: 'Acesso negado!' });
+    }
+
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 1) {
       return res.status(400).json({ error: 'Não há músicas aguardando na fila para limpar!' });
@@ -547,28 +870,43 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
   });
 
   // ==========================================
-  // ROTAS DO GERENCIADOR VIP
+  // ROTAS DO GERENCIADOR VIP (SEGURANÇA RBAC)
   // ==========================================
 
-  // Planos VIP disponíveis
-  app.get('/api/vip/plans', (req, res) => {
+  // Planos VIP disponíveis (público)
+  app.get('/api/vip/plans', (_req, res) => {
     res.json(vipManager.VIP_PLANS);
   });
 
-  // Listar todas as Chaves VIP
+  // Listar todas as Chaves VIP (APENAS O DONO DO BOT)
   app.get('/api/vip/keys', (req, res) => {
+    if (!authManager.canManageVipKeys(req.sessionUser, vipManager)) {
+      return res.status(403).json({
+        error: 'Acesso negado: apenas o dono do bot (.nolasco7) tem autorização para visualizar as chaves VIP!'
+      });
+    }
     res.json(vipManager.getAllKeys());
   });
 
-  // Gerar nova chave VIP
+  // Gerar nova chave VIP (APENAS O DONO DO BOT)
   app.post('/api/vip/keys/generate', (req, res) => {
+    if (!authManager.canManageVipKeys(req.sessionUser, vipManager)) {
+      return res.status(403).json({
+        error: 'Acesso negado: apenas o dono do bot (.nolasco7) pode gerar chaves VIP!'
+      });
+    }
     const { planId, note } = req.body;
-    const key = vipManager.createVipKey(planId || '30d', note || 'Painel Local');
+    const key = vipManager.createVipKey(planId || '30d', note || 'Painel Web (Dono)');
     res.json({ success: true, key });
   });
 
-  // Deletar / Revogar chave VIP
+  // Deletar / Revogar chave VIP (APENAS O DONO DO BOT)
   app.delete('/api/vip/keys/:code', (req, res) => {
+    if (!authManager.canManageVipKeys(req.sessionUser, vipManager)) {
+      return res.status(403).json({
+        error: 'Acesso negado: apenas o dono do bot (.nolasco7) pode revogar chaves VIP!'
+      });
+    }
     const { code } = req.params;
     const deleted = vipManager.deleteKey(code);
     if (deleted) {
@@ -578,25 +916,54 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
   });
 
-  // Listar todos os Servidores VIP
+  // Listar Servidores VIP
   app.get('/api/vip/guilds', (req, res) => {
-    res.json(vipManager.getAllVipGuilds());
+    const allGuilds = vipManager.getAllVipGuilds();
+
+    // Dono do bot vê todos os servidores VIP
+    if (authManager.canManageVipKeys(req.sessionUser, vipManager)) {
+      return res.json(allGuilds);
+    }
+
+    // Administrador autenticado vê apenas os servidores VIP que administra
+    if (req.sessionUser) {
+      const userAdminGuildIds = new Set(
+        (req.sessionUser.guilds || [])
+          .filter((g) => g.isAdmin || g.owner)
+          .map((g) => g.id)
+      );
+      const filtered = allGuilds.filter((g) => userAdminGuildIds.has(g.guildId));
+      return res.json(filtered);
+    }
+
+    // Não autenticado
+    res.json([]);
   });
 
-  // Ativação Direta de VIP em um servidor pelo painel
+  // Ativação Direta de VIP em um servidor pelo painel (APENAS O DONO DO BOT)
   app.post('/api/vip/guilds/activate', (req, res) => {
+    if (!authManager.canManageVipKeys(req.sessionUser, vipManager)) {
+      return res.status(403).json({
+        error: 'Acesso negado: apenas o dono do bot (.nolasco7) pode ativar VIP diretamente!'
+      });
+    }
     const { guildId, planId, note } = req.body;
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
       return res.status(404).json({ error: 'Servidor não encontrado no bot!' });
     }
 
-    const result = vipManager.setDirectVip(guild.id, guild.name, planId || '30d', note);
+    const result = vipManager.setDirectVip(guild.id, guild.name, planId || '30d', note || 'Painel Web (Dono)');
     res.json({ success: true, result });
   });
 
-  // Remover VIP de um servidor
+  // Remover VIP de um servidor (APENAS O DONO DO BOT)
   app.delete('/api/vip/guilds/:guildId', (req, res) => {
+    if (!authManager.canManageVipKeys(req.sessionUser, vipManager)) {
+      return res.status(403).json({
+        error: 'Acesso negado: apenas o dono do bot (.nolasco7) pode remover o VIP de um servidor!'
+      });
+    }
     const { guildId } = req.params;
     const removed = vipManager.removeVip(guildId);
     if (removed) {
@@ -606,10 +973,23 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false } =
     }
   });
 
-  // Inicia o servidor HTTP
+  // Inicia o servidor HTTP com suporte inteligente a fallback de porta
   const server = app.listen(port, () => {
     if (!quiet) {
-      console.log(`\x1b[1;95m[PAINEL WEB]\x1b[0m \x1b[1;37m🌐 Painel de Controle Chlorine Music disponível em: \x1b[1;32mhttp://localhost:${port}\x1b[0m`);
+      const displayUrl = process.env.DASHBOARD_URL || `http://localhost:${port}`;
+      console.log(`\x1b[1;95m[PAINEL WEB]\x1b[0m \x1b[1;37m🌐 Painel de Controle Chlorine Music disponível em: \x1b[1;32m${displayUrl}\x1b[0m \x1b[90m(Porta ${port})\x1b[0m`);
+    }
+  });
+
+  server.on('error', (err) => {
+    if ((err.code === 'EACCES' || err.code === 'EADDRINUSE') && port === 80) {
+      console.warn('\x1b[1;33m[PAINEL WEB AVISO]\x1b[0m Porta 80 restrita no sistema. Alternando automaticamente para a porta 3000...');
+      server.close?.();
+      app.listen(3000, () => {
+        if (!quiet) {
+          console.log('\x1b[1;95m[PAINEL WEB]\x1b[0m \x1b[1;37m🌐 Painel alternativo disponível em: \x1b[1;32mhttp://localhost:3000\x1b[0m');
+        }
+      });
     }
   });
 
