@@ -229,7 +229,7 @@ if (!isWebOnly) {
       queue.voiceChannel?.name || distube.voices.get(queue.id)?.channel?.name || null;
     const callTag = voiceChannelName ? ` [🔊 ${voiceChannelName}]` : '';
 
-    console.log(`  ${colors.gray}[${time}]${colors.reset} ${colors.purple}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.purple}[${requesterLabel}]${colors.reset}${colors.gray}${callTag}${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
+    console.log(`  ${colors.gray}[${time}]${colors.reset} ${colors.purple}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.purple}[${requesterLabel}]${colors.reset}${colors.gray}${callTag}${colors.reset}`);
 
     const payload = buildPlayerCardPayload(queue.id, queue, {
       isSkipped,

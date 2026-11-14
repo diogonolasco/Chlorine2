@@ -814,8 +814,8 @@ function createCommandsModule({
 
     const autoplay = queue.toggleAutoplay();
     const embed = statusEmbed({
-      type: 'vip',
-      title: `Autoplay ${autoplay ? 'Ativado' : 'Desativado'} • VIP 👑`,
+      type: 'info',
+      title: `Autoplay ${autoplay ? 'Ativado' : 'Desativado'}`,
       description: autoplay
         ? `${formatPlayerEmoji('autoplay')} O bot continuará tocando músicas recomendadas automaticamente ao fim da fila!`
         : `${formatPlayerEmoji('stop')} O autoplay foi desligado. O bot irá parar quando a fila terminar.`
@@ -846,8 +846,8 @@ function createCommandsModule({
 
     if (Number.isNaN(volume) || volume < 1 || volume > 200) {
       const embed = statusEmbed({
-        type: 'vip',
-        title: 'Controle de Volume • VIP 👑',
+        type: 'info',
+        title: 'Controle de Volume',
         description:
           `${formatPlayerEmoji('volume')} ${createVolumeBar(queue.volume)}\n` +
           'Escolha um valor entre **1** e **200** *(ex: `!volume 120`)*.'
@@ -857,8 +857,8 @@ function createCommandsModule({
 
     queue.setVolume(volume);
     const embed = statusEmbed({
-      type: 'vip',
-      title: 'Volume Ajustado • VIP 👑',
+      type: 'info',
+      title: 'Volume Ajustado',
       description: `${formatPlayerEmoji('volume')} ${createVolumeBar(volume)}`
     });
     return replyFn({ embeds: [embed], ...ephemeralFlag });
