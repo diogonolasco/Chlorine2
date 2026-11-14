@@ -22,6 +22,7 @@ const { YtDlpPlugin } = require('@distube/yt-dlp');
 const ffmpegStatic = require('ffmpeg-static');
 const { createSpotifyPlugin } = require('./src/spotifyPlugin');
 const vipManager = require('./src/vipManager');
+const queueSyncManager = require('./src/queueSyncManager');
 const { createDashboardServer } = require('./src/dashboardServer');
 const { createVoiceSessionManager } = require('./src/voiceSessionManager');
 const { createPlayerEmojiManager } = require('./src/playerEmojis');
@@ -191,12 +192,22 @@ client.once('clientReady', async () => {
     });
 
     // Inicia sincronização automática de VIPs com o site remoto (ShardCloud) se configurado
-    if (process.env.DASHBOARD_URL && process.env.DASHBOARD_URL.includes('shardweb.app')) {
+    const remoteDashboardUrl = process.env.DASHBOARD_URL || 'https://chlorine.shardweb.app';
+    if (remoteDashboardUrl && remoteDashboardUrl.includes('shardweb.app')) {
       vipManager.startRemoteSync({
-        dashboardUrl: process.env.DASHBOARD_URL,
+        dashboardUrl: remoteDashboardUrl,
         token: process.env.DISCORD_TOKEN
       });
     }
+
+    // Inicia sincronização contínua das FILAS e COMANDOS do player com o site remoto (ShardCloud)
+    queueSyncManager.startQueueSyncLoop({
+      dashboardUrl: remoteDashboardUrl,
+      token: process.env.DISCORD_TOKEN,
+      distube,
+      client,
+      intervalMs: 1200
+    });
   } else {
     // Modo Web Only (ShardCloud): define presença limpa do painel
     client.user.setPresence({
@@ -214,6 +225,17 @@ client.once('clientReady', async () => {
 // EVENTOS DO DISTUBE (Notificações no chat - apenas na máquina do bot)
 // ==========================================
 if (!isWebOnly) {
+  // Função auxiliar para atualização instantânea do site na nuvem
+  const triggerImmediateSync = () => {
+    const remoteDashboardUrl = process.env.DASHBOARD_URL || 'https://chlorine.shardweb.app';
+    queueSyncManager.syncLocalQueuesToRemote({
+      dashboardUrl: remoteDashboardUrl,
+      token: process.env.DISCORD_TOKEN,
+      distube,
+      client
+    }).catch(() => {});
+  };
+
   // Quando uma música começa a tocar
   distube.on('playSong', (queue, song) => {
     const isSkipped = !!queue._isSkipped;
@@ -236,17 +258,20 @@ if (!isWebOnly) {
       showLiveProgress: false
     });
     queue.textChannel?.send(payload).catch(() => {});
+    triggerImmediateSync();
   });
 
   // Quando uma música é adicionada à fila
   distube.on('addSong', (queue, song) => {
     if (queue.songs.length <= 1) return;
     queue.textChannel?.send({ embeds: [buildAddedSongEmbed(queue, song)] }).catch(() => {});
+    triggerImmediateSync();
   });
 
   // Quando uma playlist é adicionada
   distube.on('addList', (queue, playlist) => {
     queue.textChannel?.send({ embeds: [buildAddedListEmbed(queue, playlist)] }).catch(() => {});
+    triggerImmediateSync();
   });
 
   // Quando não houver mais músicas relacionadas para o autoplay
@@ -256,6 +281,7 @@ if (!isWebOnly) {
       description: '⚠️ Não foi possível encontrar mais músicas semelhantes para o Autoplay continuar.'
     });
     queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+    triggerImmediateSync();
   });
 
   // Quando a fila termina
@@ -265,6 +291,7 @@ if (!isWebOnly) {
       description: '✨ **A fila de músicas terminou!** Use `!play` ou `/play` para continuar ouvindo.'
     });
     queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+    triggerImmediateSync();
   });
 
   // Quando o canal de voz fica vazio
@@ -275,11 +302,13 @@ if (!isWebOnly) {
       description: '👋 **O canal de voz ficou vazio, saindo da call...**'
     });
     queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+    triggerImmediateSync();
   });
 
   // Quando o bot se desconecta da chamada de voz
   distube.on('disconnect', (queue) => {
     voiceSession.clearVoiceSummoner(queue.id);
+    triggerImmediateSync();
   });
 
   // Estabilizador de conexão de voz + limpeza de responsável quando o bot sair da call

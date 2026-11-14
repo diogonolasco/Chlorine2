@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const vipManager = require('./vipManager');
 const authManager = require('./authManager');
+const queueSyncManager = require('./queueSyncManager');
 const { normalizePlayQuery } = require('./spotifyPlugin');
 
 function createDashboardServer(client, distube, port = 3000, { quiet = false, testing = false } = {}) {
@@ -290,9 +291,14 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       if (!botGuild) continue;
 
       const queue = distube.getQueue(g.id);
-      const activeVoice = getActiveVoiceChannel(g.id, botGuild, queue);
+      const remoteQueue = queueSyncManager.getRemoteQueue(g.id);
+      let activeVoice = getActiveVoiceChannel(g.id, botGuild, queue);
+      if (!activeVoice && remoteQueue?.voiceChannel) {
+        activeVoice = remoteQueue.voiceChannel;
+      }
       const isVip = vipManager.isGuildVip(g.id);
       const vipInfo = isVip ? vipManager.getGuildVipInfo(g.id) : null;
+      const hasActive = Boolean((queue && queue.songs?.length > 0) || (remoteQueue && remoteQueue.songsCount > 0));
 
       const guildSummary = {
         id: g.id,
@@ -303,7 +309,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
         vipInfo,
         isAdmin: g.isAdmin,
         owner: g.owner,
-        hasActiveQueue: Boolean(queue && queue.songs?.length > 0),
+        hasActiveQueue: hasActive,
         voiceChannelName: activeVoice?.name || null
       };
 
@@ -334,6 +340,22 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
   });
 
   // ==========================================
+  // SINCRONIZAÇÃO EM TEMPO REAL (WINDOWS BOT <-> PAINEL SHARDCLOUD)
+  // ==========================================
+
+  // Endpoint de Sincronização em Tempo Real recebendo do Bot Ativo
+  app.post('/api/internal/sync-queue', (req, res) => {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const expectedToken = (process.env.DISCORD_TOKEN || '').trim();
+    if (!expectedToken || token !== expectedToken) {
+      return res.status(401).json({ error: 'Não autorizado para sincronização interna' });
+    }
+    const pendingCmds = queueSyncManager.handleIncomingSync(req.body);
+    return res.json({ success: true, commands: pendingCmds });
+  });
+
+  // ==========================================
   // ROTAS DA API PÚBLICA
   // ==========================================
 
@@ -345,9 +367,14 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const guilds = Array.from(client.guilds.cache.values()).map((guild) => {
       const queue = distube.getQueue(guild.id);
-      const activeVoice = getActiveVoiceChannel(guild.id, guild, queue);
+      const remoteQueue = queueSyncManager.getRemoteQueue(guild.id);
+      let activeVoice = getActiveVoiceChannel(guild.id, guild, queue);
+      if (!activeVoice && remoteQueue?.voiceChannel) {
+        activeVoice = remoteQueue.voiceChannel;
+      }
       const isVip = vipManager.isGuildVip(guild.id);
       const vipInfo = isVip ? vipManager.getGuildVipInfo(guild.id) : null;
+      const hasActive = Boolean((queue && queue.songs?.length > 0) || (remoteQueue && remoteQueue.songsCount > 0));
 
       return {
         id: guild.id,
@@ -356,13 +383,15 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
         memberCount: guild.memberCount || 0,
         isVip,
         vipInfo,
-        hasActiveQueue: Boolean(queue && queue.songs?.length > 0),
+        hasActiveQueue: hasActive,
         voiceChannelName: activeVoice?.name || null
       };
     });
 
     const totalGuilds = guilds.length;
-    const activeQueuesCount = distube.queues?.collection?.size || 0;
+    const localActive = distube.queues?.collection?.size || 0;
+    const remoteActive = queueSyncManager.getActiveRemoteQueuesCount();
+    const activeQueuesCount = Math.max(localActive, remoteActive);
     const allVipGuilds = vipManager.getAllVipGuilds().filter((g) => g.active);
     const allKeys = authManager.canManageVipKeys(req.sessionUser, vipManager) ? vipManager.getAllKeys() : [];
 
@@ -394,7 +423,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
     }
 
     const queue = distube.getQueue(guildId);
-    const activeVoice = getActiveVoiceChannel(guildId, guild, queue);
+    let activeVoice = getActiveVoiceChannel(guildId, guild, queue);
     const isVip = vipManager.isGuildVip(guildId);
     const vipInfo = vipManager.getGuildVipInfo(guildId);
 
@@ -409,6 +438,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     let currentSong = null;
     let songList = [];
+    let queuePayload = null;
 
     if (queue && queue.songs?.length > 0) {
       const song = queue.songs[0];
@@ -434,6 +464,34 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
         thumbnail: s.thumbnail,
         user: formatDashboardRequester(s, queue)
       }));
+
+      const activeVoicePayload = activeVoice
+        ? { id: activeVoice.id, name: activeVoice.name }
+        : null;
+
+      queuePayload = {
+        playing: !queue.paused,
+        paused: Boolean(queue.paused),
+        volume: queue.volume,
+        autoplay: Boolean(queue.autoplay),
+        repeatMode: typeof queue.repeatMode === 'number' ? queue.repeatMode : 0,
+        canPrevious: Boolean(queue.previousSongs?.length || queue.repeatMode === 2),
+        voiceChannel: activeVoicePayload,
+        currentTime: queue.currentTime,
+        formattedCurrentTime: queue.formattedCurrentTime,
+        songsCount: queue.songs.length,
+        currentSong,
+        songs: songList
+      };
+    } else {
+      // Fallback para fila sincronizada remotamente (quando o bot toca no Windows e o site roda no ShardCloud)
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue && remoteQueue.songsCount > 0) {
+        queuePayload = remoteQueue;
+        if (!activeVoice && remoteQueue.voiceChannel) {
+          activeVoice = remoteQueue.voiceChannel;
+        }
+      }
     }
 
     const activeVoicePayload = activeVoice
@@ -451,22 +509,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       },
       activeVoiceChannel: activeVoicePayload,
       voiceChannels,
-      queue: queue
-        ? {
-            playing: !queue.paused,
-            paused: queue.paused,
-            volume: queue.volume,
-            autoplay: queue.autoplay,
-            repeatMode: typeof queue.repeatMode === 'number' ? queue.repeatMode : 0,
-            canPrevious: Boolean(queue.previousSongs?.length || queue.repeatMode === 2),
-            voiceChannel: activeVoicePayload,
-            currentTime: queue.currentTime,
-            formattedCurrentTime: queue.formattedCurrentTime,
-            songsCount: queue.songs.length,
-            currentSong,
-            songs: songList
-          }
-        : null
+      queue: queuePayload
     });
   });
 
@@ -511,6 +554,34 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       voiceChannel = guild.channels.cache.find((c) => c.isVoiceBased());
     }
 
+    const isWebOnly = process.env.WEB_ONLY === 'true' || (process.platform === 'linux' && process.env.WEB_ONLY !== 'false');
+    const existingQueue = distube.getQueue(guildId);
+    const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+
+    // Se estiver no servidor web nuvem (ShardCloud) ou se a fila for remota, envia para o bot ativo
+    if (isWebOnly || (remoteQueue && !existingQueue)) {
+      queueSyncManager.enqueueRemoteCommand(guildId, 'play', {
+        query: normalizedQuery,
+        voiceChannelId: voiceChannel?.id || voiceChannelId,
+        mode
+      });
+
+      const actionLabel =
+        mode === 'now' && remoteQueue
+          ? 'Tocando agora'
+          : mode === 'next' && remoteQueue
+          ? 'Adicionada como próxima'
+          : remoteQueue
+          ? 'Adicionada à fila'
+          : 'Tocando';
+
+      return res.json({
+        success: true,
+        voiceChannel: voiceChannel ? { id: voiceChannel.id, name: voiceChannel.name } : null,
+        message: `${actionLabel}: "${normalizedQuery}" enviada ao Chlorine Player!`
+      });
+    }
+
     if (!voiceChannel) {
       return res.status(400).json({ error: 'Nenhum canal de voz disponível no servidor!' });
     }
@@ -520,7 +591,6 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
         (c) => !c.isVoiceBased() && c.isTextBased() && c.permissionsFor(guild.members.me)?.has('SendMessages')
       ) || guild.systemChannel;
 
-    const existingQueue = distube.getQueue(guildId);
     const playOptions = {
       textChannel: textChannel || undefined,
       member: guild.members.me
@@ -570,6 +640,15 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'pause', {});
+        return res.json({
+          success: true,
+          paused: !remoteQueue.paused,
+          message: remoteQueue.paused ? 'Comando para despausar enviado!' : 'Comando para pausar enviado!'
+        });
+      }
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
@@ -591,6 +670,11 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'skip', {});
+        return res.json({ success: true, message: 'Comando para pular música enviado!' });
+      }
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
@@ -618,6 +702,11 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'previous', {});
+        return res.json({ success: true, message: 'Comando para faixa anterior enviado!' });
+      }
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
@@ -638,14 +727,19 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       return res.status(403).json({ error: 'Acesso negado!' });
     }
 
-    const queue = distube.getQueue(guildId);
-    if (!queue) {
-      return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
-    }
-
     const timeSec = Math.floor(Number(time));
     if (!Number.isFinite(timeSec) || timeSec < 0) {
       return res.status(400).json({ error: 'Tempo inválido para avançar na faixa!' });
+    }
+
+    const queue = distube.getQueue(guildId);
+    if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'seek', { time: timeSec });
+        return res.json({ success: true, time: timeSec, message: 'Comando para mover reprodução enviado!' });
+      }
+      return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
     try {
@@ -664,9 +758,17 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
     }
 
     const queue = distube.getQueue(guildId);
-    if (queue) {
-      await queue.stop().catch(() => {});
+    if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'stop', {});
+        return res.json({ success: true, message: 'Comando para parar música enviado!' });
+      }
+      distube.voices.leave(guildId);
+      return res.json({ success: true, message: 'Música parada e bot desconectado!' });
     }
+
+    await queue.stop().catch(() => {});
     distube.voices.leave(guildId);
     res.json({ success: true, message: 'Música parada e bot desconectado!' });
   });
@@ -678,14 +780,19 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       return res.status(403).json({ error: 'Acesso negado!' });
     }
 
-    const queue = distube.getQueue(guildId);
-    if (!queue) {
-      return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
-    }
-
     const vol = parseInt(volume, 10);
     if (isNaN(vol) || vol < 1 || vol > 200) {
       return res.status(400).json({ error: 'Volume deve ser um número entre 1 e 200!' });
+    }
+
+    const queue = distube.getQueue(guildId);
+    if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'volume', { volume: vol });
+        return res.json({ success: true, volume: vol, message: `Volume ajustado para ${vol}%!` });
+      }
+      return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
     queue.setVolume(vol);
@@ -701,6 +808,15 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'autoplay', {});
+        return res.json({
+          success: true,
+          autoplay: !remoteQueue.autoplay,
+          message: `Autoplay ${!remoteQueue.autoplay ? 'Ativado' : 'Desativado'}!`
+        });
+      }
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
@@ -717,6 +833,15 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        const currentMode = typeof remoteQueue.repeatMode === 'number' ? remoteQueue.repeatMode : 0;
+        const requestedMode = mode !== undefined && mode !== null ? parseInt(mode, 10) : (currentMode + 1) % 3;
+        const targetMode = [0, 1, 2].includes(requestedMode) ? requestedMode : 0;
+        queueSyncManager.enqueueRemoteCommand(guildId, 'repeat', { mode: targetMode });
+        const labels = { 0: 'Desligado', 1: 'Repetir Música Atual', 2: 'Repetir Toda a Fila' };
+        return res.json({ success: true, repeatMode: targetMode, message: `Repetição: ${labels[targetMode] || 'Desligado'}!` });
+      }
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
     }
 
@@ -738,6 +863,11 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 2) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue && remoteQueue.songsCount > 2) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'shuffle', {});
+        return res.json({ success: true, message: 'Comando para embaralhar fila enviado!' });
+      }
       return res.status(400).json({ error: 'É necessário ter ao menos 2 músicas aguardando na fila para embaralhar!' });
     }
 
@@ -770,6 +900,19 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       return res.status(404).json({ error: 'Canal de voz selecionado não encontrado!' });
     }
 
+    const queue = distube.getQueue(guildId);
+    if (!queue) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'moveVoice', { voiceChannelId });
+        return res.json({
+          success: true,
+          voiceChannel: { id: targetChannel.id, name: targetChannel.name },
+          message: `Comando para mover bot para a call 🔊 ${targetChannel.name} enviado!`
+        });
+      }
+    }
+
     try {
       await distube.voices.join(targetChannel);
       res.json({
@@ -789,12 +932,24 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       return res.status(403).json({ error: 'Acesso negado!' });
     }
 
+    const targetIndex = parseInt(index, 10);
     const queue = distube.getQueue(guildId);
     if (!queue || !queue.songs?.length) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue && remoteQueue.songsCount > 1) {
+        if (!Number.isInteger(targetIndex) || targetIndex < 1 || targetIndex >= remoteQueue.songsCount) {
+          return res.status(400).json({ error: 'Posição inválida na fila!' });
+        }
+        queueSyncManager.enqueueRemoteCommand(guildId, 'jump', { index: targetIndex });
+        return res.json({
+          success: true,
+          skippedCount: targetIndex,
+          message: `Comando para pular faixa enviado!`
+        });
+      }
       return res.status(400).json({ error: 'Nenhuma fila ativa neste servidor!' });
     }
 
-    const targetIndex = parseInt(index, 10);
     if (!Number.isInteger(targetIndex) || targetIndex < 1 || targetIndex >= queue.songs.length) {
       return res.status(400).json({ error: 'Posição inválida na fila!' });
     }
@@ -821,13 +976,19 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       return res.status(403).json({ error: 'Acesso negado!' });
     }
 
+    const from = parseInt(fromIndex, 10);
+    const to = parseInt(toIndex, 10);
+
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 1) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue && remoteQueue.songsCount > 1) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'moveQueueSong', { fromIndex: from, toIndex: to });
+        return res.json({ success: true, message: 'Comando para reordenar fila enviado!' });
+      }
       return res.status(400).json({ error: 'Nenhuma música aguardando na fila para mover!' });
     }
 
-    const from = parseInt(fromIndex, 10);
-    const to = parseInt(toIndex, 10);
     const maxIndex = queue.songs.length - 1;
 
     if (
@@ -861,12 +1022,17 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       return res.status(403).json({ error: 'Acesso negado!' });
     }
 
+    const targetIndex = parseInt(index, 10);
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 1) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue && remoteQueue.songsCount > 1) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'remove', { index: targetIndex });
+        return res.json({ success: true, message: 'Comando para remover música enviado!' });
+      }
       return res.status(400).json({ error: 'Nenhuma música aguardando na fila para remover!' });
     }
 
-    const targetIndex = parseInt(index, 10);
     if (!Number.isInteger(targetIndex) || targetIndex < 1 || targetIndex >= queue.songs.length) {
       return res.status(400).json({ error: 'Posição inválida para remover da fila!' });
     }
@@ -888,6 +1054,11 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
     const queue = distube.getQueue(guildId);
     if (!queue || queue.songs.length <= 1) {
+      const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
+      if (remoteQueue && remoteQueue.songsCount > 1) {
+        queueSyncManager.enqueueRemoteCommand(guildId, 'clear', {});
+        return res.json({ success: true, message: 'Comando para limpar fila enviado!' });
+      }
       return res.status(400).json({ error: 'Não há músicas aguardando na fila para limpar!' });
     }
 
