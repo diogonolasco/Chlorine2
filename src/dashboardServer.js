@@ -116,8 +116,8 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
 
   // Iniciar fluxo de Login com Discord
   app.get('/auth/discord', (req, res) => {
-    const clientId = process.env.DISCORD_CLIENT_ID || client.user?.id;
-    const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+    const clientId = (process.env.DISCORD_CLIENT_ID || client.user?.id || '1499966080477823046').toString().trim();
+    const clientSecret = (process.env.DISCORD_CLIENT_SECRET || '').toString().trim().replace(/^["']|["']$/g, '');
 
     if (!clientSecret) {
       return res.status(500).send(`
@@ -194,8 +194,8 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
       // Estado opcional para CSRF check
     }
 
-    const clientId = process.env.DISCORD_CLIENT_ID || client.user?.id;
-    const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+    const clientId = (process.env.DISCORD_CLIENT_ID || client.user?.id || '1499966080477823046').toString().trim();
+    const clientSecret = (process.env.DISCORD_CLIENT_SECRET || '').toString().trim().replace(/^["']|["']$/g, '');
     const baseUrl = getBaseUrl(req);
     const redirectUri = `${baseUrl}/auth/callback`;
 

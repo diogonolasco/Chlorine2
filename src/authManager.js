@@ -265,21 +265,47 @@ function getDiscordAuthUrl(clientId, redirectUri, state) {
  * Troca o código OAuth2 do Discord por um Access Token
  */
 async function exchangeDiscordCode(code, clientId, clientSecret, redirectUri) {
+  const cleanClientId = String(clientId || '').trim();
+  const cleanClientSecret = String(clientSecret || '').trim().replace(/^["']|["']$/g, '');
+
   const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
+    client_id: cleanClientId,
+    client_secret: cleanClientSecret,
     grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri
+    code: String(code || '').trim(),
+    redirect_uri: String(redirectUri || '').trim()
   });
 
-  const res = await fetch('https://discord.com/api/oauth2/token', {
+  let res = await fetch('https://discord.com/api/oauth2/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
     body: params.toString()
   });
+
+  // Se falhar com 401, tenta via cabeçalho Basic Auth (padrão RFC 6749)
+  if (!res.ok && res.status === 401 && cleanClientId && cleanClientSecret) {
+    const basicAuth = Buffer.from(`${cleanClientId}:${cleanClientSecret}`).toString('base64');
+    const basicParams = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: String(code || '').trim(),
+      redirect_uri: String(redirectUri || '').trim()
+    });
+
+    const resBasic = await fetch('https://discord.com/api/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${basicAuth}`
+      },
+      body: basicParams.toString()
+    });
+
+    if (resBasic.ok) {
+      res = resBasic;
+    }
+  }
 
   if (!res.ok) {
     const errText = await res.text();
