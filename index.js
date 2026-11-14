@@ -78,6 +78,12 @@ const voiceSession = createVoiceSessionManager({
 // Gerenciador dos emojis personalizados dos botões do player (Application Emojis)
 const playerEmojis = createPlayerEmojiManager({ rootDir: __dirname });
 
+// Modo Exclusivo Web (ShardCloud / Servidor dedicado ao site)
+// Se WEB_ONLY=true ou se estiver rodando no Linux (ShardCloud), desativa o processamento
+// de comandos de chat no Discord, garantindo que apenas a sua máquina Windows responda
+// aos comandos, eliminando 100% qualquer resposta duplicada (2x)!
+const isWebOnly = process.env.WEB_ONLY === 'true' || (process.platform === 'linux' && process.env.WEB_ONLY !== 'false');
+
 // Módulo central de comandos, embeds, bloqueios VIP e interações (comandos.js)
 const {
   statusEmbed,
@@ -94,8 +100,10 @@ const {
   rootDir: __dirname
 });
 
-// Registra os listeners de comandos (! /), menções, fila e botões do player
-registerCommandListeners();
+// Registra os listeners de comandos (! /), menções, fila e botões do player APENAS fora do modo Web Only
+if (!isWebOnly) {
+  registerCommandListeners();
+}
 
 // Cores ANSI para o terminal (Identidade Roxo Neon & Dourado VIP)
 const colors = {
@@ -142,7 +150,8 @@ client.once('clientReady', async () => {
   console.log(renderBoxLine(c.yellow + '⚡ Ping:' + c.reset, c.white + `${client.ws.ping}ms` + c.reset));
   console.log(renderBoxLine(c.yellow + '🎶 Prefixo:' + c.reset, c.white + PREFIX + ' e /' + c.reset));
   console.log(renderBoxLine(c.yellow + '🌐 Painel Web:' + c.reset, c.purple + dashboardDisplayUrl + c.reset));
-  console.log(renderBoxLine(c.yellow + '🟢 Status:' + c.reset, c.green + 'Online & Pronto para tocar!' + c.reset));
+  const statusDesc = isWebOnly ? 'Site Online (Sem comandos de chat)' : 'Bot Completo Online & Pronto para tocar!';
+  console.log(renderBoxLine(c.yellow + '🟢 Status:' + c.reset, c.green + statusDesc + c.reset));
   console.log(c.purple + '  ╚══════════════════════════════════════════════════════════════╝' + c.reset);
   console.log('');
 
@@ -153,136 +162,155 @@ client.once('clientReady', async () => {
     console.error(`${c.red}[ERRO]${c.reset} Falha ao iniciar Painel Web:`, err?.message || err);
   }
 
-  // Registra os Slash Commands globalmente para aparecerem no perfil do bot
-  try {
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-    await rest.put(
-      Routes.applicationCommands(client.user.id),
-      { body: slashCommands }
-    );
-  } catch (err) {
-    console.error(`${c.red}[ERRO]${c.reset} Falha ao sincronizar comandos de barra:`, err?.message || err);
-  }
+  if (!isWebOnly) {
+    // Registra os Slash Commands globalmente para aparecerem no perfil do bot
+    try {
+      const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+      await rest.put(
+        Routes.applicationCommands(client.user.id),
+        { body: slashCommands }
+      );
+    } catch (err) {
+      console.error(`${c.red}[ERRO]${c.reset} Falha ao sincronizar comandos de barra:`, err?.message || err);
+    }
 
-  // Sincroniza os emojis personalizados dos botões do player no aplicativo Discord
-  try {
-    await playerEmojis.syncWithApplication(client.application);
-  } catch (err) {
-    console.error(`${c.yellow}[AVISO]${c.reset} Falha ao sincronizar emojis:`, err?.message || err);
-  }
+    // Sincroniza os emojis personalizados dos botões do player no aplicativo Discord
+    try {
+      await playerEmojis.syncWithApplication(client.application);
+    } catch (err) {
+      console.error(`${c.yellow}[AVISO]${c.reset} Falha ao sincronizar emojis:`, err?.message || err);
+    }
 
-  client.user.setPresence({
-    activities: [{
-      name: 'Comece usando !help',
-      type: ActivityType.Streaming,
-      url: 'https://www.twitch.tv/discord'
-    }],
-    status: 'online'
-  });
+    client.user.setPresence({
+      activities: [{
+        name: 'Comece usando !help',
+        type: ActivityType.Streaming,
+        url: 'https://www.twitch.tv/discord'
+      }],
+      status: 'online'
+    });
+
+    // Inicia sincronização automática de VIPs com o site remoto (ShardCloud) se configurado
+    if (process.env.DASHBOARD_URL && process.env.DASHBOARD_URL.includes('shardweb.app')) {
+      vipManager.startRemoteSync({
+        dashboardUrl: process.env.DASHBOARD_URL,
+        token: process.env.DISCORD_TOKEN
+      });
+    }
+  } else {
+    // Modo Web Only (ShardCloud): define presença limpa do painel
+    client.user.setPresence({
+      activities: [{
+        name: 'Painel Web • chlorine.shardweb.app',
+        type: ActivityType.Streaming,
+        url: 'https://www.twitch.tv/discord'
+      }],
+      status: 'online'
+    });
+  }
 });
 
 // ==========================================
-// EVENTOS DO DISTUBE (Notificações no chat)
+// EVENTOS DO DISTUBE (Notificações no chat - apenas na máquina do bot)
 // ==========================================
+if (!isWebOnly) {
+  // Quando uma música começa a tocar
+  distube.on('playSong', (queue, song) => {
+    const isSkipped = !!queue._isSkipped;
+    queue._isSkipped = false;
 
-// Quando uma música começa a tocar
-distube.on('playSong', (queue, song) => {
-  const isSkipped = !!queue._isSkipped;
-  queue._isSkipped = false;
+    const isVip = vipManager.isGuildVip(queue.id);
+    const time = new Date().toLocaleTimeString('pt-BR');
+    const isBotQueued = song.user?.id === client.user?.id;
+    const requesterLabel = isBotQueued
+      ? (queue.autoplay ? 'Autoplay Automático' : 'Painel Web')
+      : (song.user?.tag || song.user?.username || 'Membro');
+    const voiceChannelName =
+      queue.voiceChannel?.name || distube.voices.get(queue.id)?.channel?.name || null;
+    const callTag = voiceChannelName ? ` [🔊 ${voiceChannelName}]` : '';
 
-  const isVip = vipManager.isGuildVip(queue.id);
-  const time = new Date().toLocaleTimeString('pt-BR');
-  const isBotQueued = song.user?.id === client.user?.id;
-  const requesterLabel = isBotQueued
-    ? (queue.autoplay ? 'Autoplay Automático' : 'Painel Web')
-    : (song.user?.tag || song.user?.username || 'Membro');
-  const voiceChannelName =
-    queue.voiceChannel?.name || distube.voices.get(queue.id)?.channel?.name || null;
-  const callTag = voiceChannelName ? ` [🔊 ${voiceChannelName}]` : '';
+    console.log(`  ${colors.gray}[${time}]${colors.reset} ${colors.purple}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.purple}[${requesterLabel}]${colors.reset}${colors.gray}${callTag}${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
 
-  console.log(`  ${colors.gray}[${time}]${colors.reset} ${colors.purple}▶ ${isSkipped ? 'PULADA & TOCANDO' : 'TOCANDO'}:${colors.reset} ${colors.white}${song.name}${colors.reset} ${colors.gray}(${song.formattedDuration})${colors.reset} ${colors.purple}[${requesterLabel}]${colors.reset}${colors.gray}${callTag}${colors.reset} ${isVip ? colors.yellow + '[VIP 👑]' + colors.reset : ''}`);
-
-  const payload = buildPlayerCardPayload(queue.id, queue, {
-    isSkipped,
-    showLiveProgress: false
+    const payload = buildPlayerCardPayload(queue.id, queue, {
+      isSkipped,
+      showLiveProgress: false
+    });
+    queue.textChannel?.send(payload).catch(() => {});
   });
-  queue.textChannel?.send(payload).catch(() => {});
-});
 
-// Quando uma música é adicionada à fila
-distube.on('addSong', (queue, song) => {
-  // Se for a primeira música da fila (ela já dispara 'playSong' com o card principal), não duplica notificação
-  if (queue.songs.length <= 1) return;
-
-  queue.textChannel?.send({ embeds: [buildAddedSongEmbed(queue, song)] }).catch(() => {});
-});
-
-// Quando uma playlist é adicionada
-distube.on('addList', (queue, playlist) => {
-  queue.textChannel?.send({ embeds: [buildAddedListEmbed(queue, playlist)] }).catch(() => {});
-});
-
-// Quando não houver mais músicas relacionadas para o autoplay
-distube.on('noRelated', (queue) => {
-  const embed = statusEmbed({
-    type: 'error',
-    description: '⚠️ Não foi possível encontrar mais músicas semelhantes para o Autoplay continuar.'
+  // Quando uma música é adicionada à fila
+  distube.on('addSong', (queue, song) => {
+    if (queue.songs.length <= 1) return;
+    queue.textChannel?.send({ embeds: [buildAddedSongEmbed(queue, song)] }).catch(() => {});
   });
-  queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
-});
 
-// Quando a fila termina
-distube.on('finish', (queue) => {
-  const embed = statusEmbed({
-    type: 'info',
-    description: '✨ **A fila de músicas terminou!** Use `!play` ou `/play` para continuar ouvindo.'
+  // Quando uma playlist é adicionada
+  distube.on('addList', (queue, playlist) => {
+    queue.textChannel?.send({ embeds: [buildAddedListEmbed(queue, playlist)] }).catch(() => {});
   });
-  queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
-});
 
-// Quando o canal de voz fica vazio
-distube.on('empty', (queue) => {
-  voiceSession.clearVoiceSummoner(queue.id);
-  const embed = statusEmbed({
-    type: 'info',
-    description: '👋 **O canal de voz ficou vazio, saindo da call...**'
-  });
-  queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
-});
-
-// Quando o bot se desconecta da chamada de voz
-distube.on('disconnect', (queue) => {
-  voiceSession.clearVoiceSummoner(queue.id);
-});
-
-// Estabilizador de conexão de voz + limpeza de responsável quando o bot sair da call
-client.on('voiceStateUpdate', (oldState, newState) => {
-  if (newState.id === client.user.id) {
-    if (!newState.channelId) {
-      voiceSession.clearVoiceSummoner(newState.guild.id);
-      return;
-    }
-    const queue = distube.getQueue(newState.guild.id);
-    if (queue?.voice?.connection && typeof queue.voice.connection.configureNetworking === 'function') {
-      try {
-        queue.voice.connection.configureNetworking();
-      } catch {}
-    }
-  }
-});
-
-// Tratamento de erros do DisTube
-distube.on('error', (error, queue) => {
-  console.error(`  ${colors.red}[ERRO]${colors.reset} DisTube: ${error?.message || error}`);
-  if (queue?.textChannel) {
-    const errText = String(error?.message || error || 'Erro desconhecido').slice(0, 260);
+  // Quando não houver mais músicas relacionadas para o autoplay
+  distube.on('noRelated', (queue) => {
     const embed = statusEmbed({
       type: 'error',
-      description: `⚠️ **Erro ao reproduzir o áudio:** \`${errText}\``
+      description: '⚠️ Não foi possível encontrar mais músicas semelhantes para o Autoplay continuar.'
     });
-    queue.textChannel.send({ embeds: [embed] }).catch(() => {});
-  }
-});
+    queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  // Quando a fila termina
+  distube.on('finish', (queue) => {
+    const embed = statusEmbed({
+      type: 'info',
+      description: '✨ **A fila de músicas terminou!** Use `!play` ou `/play` para continuar ouvindo.'
+    });
+    queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  // Quando o canal de voz fica vazio
+  distube.on('empty', (queue) => {
+    voiceSession.clearVoiceSummoner(queue.id);
+    const embed = statusEmbed({
+      type: 'info',
+      description: '👋 **O canal de voz ficou vazio, saindo da call...**'
+    });
+    queue.textChannel?.send({ embeds: [embed] }).catch(() => {});
+  });
+
+  // Quando o bot se desconecta da chamada de voz
+  distube.on('disconnect', (queue) => {
+    voiceSession.clearVoiceSummoner(queue.id);
+  });
+
+  // Estabilizador de conexão de voz + limpeza de responsável quando o bot sair da call
+  client.on('voiceStateUpdate', (oldState, newState) => {
+    if (newState.id === client.user.id) {
+      if (!newState.channelId) {
+        voiceSession.clearVoiceSummoner(newState.guild.id);
+        return;
+      }
+      const queue = distube.getQueue(newState.guild.id);
+      if (queue?.voice?.connection && typeof queue.voice.connection.configureNetworking === 'function') {
+        try {
+          queue.voice.connection.configureNetworking();
+        } catch {}
+      }
+    }
+  });
+
+  // Tratamento de erros do DisTube
+  distube.on('error', (error, queue) => {
+    console.error(`  ${colors.red}[ERRO]${colors.reset} DisTube: ${error?.message || error}`);
+    if (queue?.textChannel) {
+      const errText = String(error?.message || error || 'Erro desconhecido').slice(0, 260);
+      const embed = statusEmbed({
+        type: 'error',
+        description: `⚠️ **Erro ao reproduzir o áudio:** \`${errText}\``
+      });
+      queue.textChannel.send({ embeds: [embed] }).catch(() => {});
+    }
+  });
+}
 
 // Inicia o bot com o Token do arquivo .env
 const token = process.env.DISCORD_TOKEN;

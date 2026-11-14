@@ -321,6 +321,83 @@ function getAllVipGuilds() {
   }));
 }
 
+// Mescla dados remotos e locais garantindo integridade de chaves e servidores
+function mergeDatabase(remoteData) {
+  if (!remoteData || typeof remoteData !== 'object') return loadData();
+
+  const localData = loadData();
+  let changed = false;
+
+  // 1. Mesclar chaves VIP
+  if (remoteData.keys && typeof remoteData.keys === 'object') {
+    for (const [code, rKey] of Object.entries(remoteData.keys)) {
+      const lKey = localData.keys[code];
+      if (!lKey) {
+        localData.keys[code] = rKey;
+        changed = true;
+      } else if (!lKey.used && rKey.used) {
+        localData.keys[code] = rKey;
+        changed = true;
+      }
+    }
+  }
+
+  // 2. Mesclar servidores VIP
+  if (remoteData.guilds && typeof remoteData.guilds === 'object') {
+    for (const [guildId, rGuild] of Object.entries(remoteData.guilds)) {
+      const lGuild = localData.guilds[guildId];
+      if (!lGuild) {
+        localData.guilds[guildId] = rGuild;
+        changed = true;
+      } else if (rGuild.expiresAt > lGuild.expiresAt) {
+        localData.guilds[guildId] = rGuild;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    saveData(localData);
+  }
+  return localData;
+}
+
+// Sincroniza dados com o site remoto (ShardCloud)
+async function syncWithRemote(dashboardUrl, authToken) {
+  if (!dashboardUrl || typeof dashboardUrl !== 'string') return null;
+  const cleanUrl = dashboardUrl.replace(/\/+$/, '');
+  const localData = loadData();
+
+  try {
+    const res = await fetch(`${cleanUrl}/api/vip/sync-data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`
+      },
+      body: JSON.stringify(localData)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json.database) {
+        return mergeDatabase(json.database);
+      }
+    }
+  } catch {}
+  return localData;
+}
+
+let syncTimer = null;
+function startRemoteSync({ dashboardUrl, token, intervalMs = 15000 } = {}) {
+  if (!dashboardUrl || syncTimer) return;
+  syncWithRemote(dashboardUrl, token).catch(() => {});
+  syncTimer = setInterval(() => {
+    syncWithRemote(dashboardUrl, token).catch(() => {});
+  }, intervalMs);
+  syncTimer.unref?.();
+}
+
 module.exports = {
   OWNER_ID,
   VIP_PLANS,
@@ -334,5 +411,9 @@ module.exports = {
   deleteKey,
   getAllKeys,
   getAllVipGuilds,
-  formatRemainingTime
+  formatRemainingTime,
+  mergeDatabase,
+  syncWithRemote,
+  startRemoteSync,
+  getRawDatabase: loadData
 };

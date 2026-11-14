@@ -984,6 +984,42 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
     }
   });
 
+  // Sincronização segura de banco de dados VIP entre bot local (Windows) e site (ShardCloud)
+  app.post('/api/vip/sync-data', (req, res) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const expectedToken = process.env.DISCORD_TOKEN;
+
+    const isAuthorized =
+      (token && expectedToken && token === expectedToken) ||
+      (req.sessionUser && req.sessionUser.isOwner) ||
+      testing;
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: 'Não autorizado para sincronização VIP!' });
+    }
+
+    const merged = vipManager.mergeDatabase(req.body);
+    res.json({ success: true, database: merged });
+  });
+
+  app.get('/api/vip/sync-data', (req, res) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const expectedToken = process.env.DISCORD_TOKEN;
+
+    const isAuthorized =
+      (token && expectedToken && token === expectedToken) ||
+      (req.sessionUser && req.sessionUser.isOwner) ||
+      testing;
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: 'Não autorizado!' });
+    }
+
+    res.json({ success: true, database: vipManager.getRawDatabase ? vipManager.getRawDatabase() : {} });
+  });
+
   // Inicia o servidor HTTP com suporte inteligente a fallback de porta
   const server = app.listen(port, () => {
     if (!quiet) {
