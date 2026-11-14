@@ -88,11 +88,21 @@ Acesse e gerencie suas músicas em tempo real de qualquer lugar pelo celular ou 
 Para máxima estabilidade de áudio e segurança contra bloqueios:
 
 ```mermaid
-flowchart LR
-    A["💻 Bot Ativo (Windows / Local)<br>• DisTube & FFmpeg<br>• Conexão de Voz UDP<br>• IP Residencial (Sem bloqueios do YT)"] 
-    <--> |"Sincronização em Tempo Real<br>POST /api/internal/sync-queue"| 
-    B["☁️ Painel Web (ShardCloud / Nuvem 24/7)<br>• chlorine.shardweb.app<br>• Login Discord OAuth2<br>• Banco de VIPs e APIs"]
-    B <--> C["📱 Membros & Donos<br>(Celular / Navegador)"]
+flowchart TD
+    subgraph PC ["💻 Computador (Windows / Local)"]
+        A["DisTube & FFmpeg<br/>Streaming de Áudio HD<br/>Conexão UDP sem bloqueios"]
+    end
+
+    subgraph Nuvem ["☁️ ShardCloud (Nuvem 24/7)"]
+        B["Painel Web Online<br/>chlorine.shardweb.app<br/>Login Discord OAuth2 & VIPs"]
+    end
+
+    subgraph Dispositivos ["📱 Dispositivos"]
+        C["Membros & Administradores<br/>Controle via Celular ou PC"]
+    end
+
+    A <-->|"Sincronização em Tempo Real"| B
+    B <-->|"Controle do Player"| C
 ```
 
 - **ShardCloud (Nuvem 24/7):** Roda o painel web oficial, autentica usuários via Discord OAuth2 e disponibiliza a interface de controle online sem quedas.
