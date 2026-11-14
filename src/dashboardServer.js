@@ -30,8 +30,9 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
   }
 
   function getBaseUrl(req) {
-    if (process.env.DASHBOARD_URL && !process.env.DASHBOARD_URL.includes('seu-subdominio')) {
-      return process.env.DASHBOARD_URL.replace(/\/+$/, '');
+    let url = process.env.DASHBOARD_URL;
+    if (url && !url.includes('seu-subdominio')) {
+      return url.trim().replace(/\/+$/, '').replace(/\/auth\/callback$/i, '');
     }
     const host = req.get('host') || '';
     const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || host.includes('shardweb.app');
