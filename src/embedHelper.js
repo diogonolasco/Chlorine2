@@ -108,6 +108,55 @@ function getRequesterDisplay(queue, song, botUserId = null, formatEmoji = null) 
   return song?.user ? `${song.user}` : 'Membro';
 }
 
+function applyBotEmojis(text, formatEmoji) {
+  if (!text || typeof text !== 'string' || typeof formatEmoji !== 'function') return text;
+
+  const emojiMap = {
+    '❌': 'cross',
+    '⛔': 'cross',
+    '✅': 'check',
+    '⚠️': 'warn',
+    '⚠': 'warn',
+    '🌐': 'web',
+    '🔒': 'lock',
+    '🔓': 'unlock',
+    '✨': 'sparkles',
+    '📅': 'calendar',
+    '🏷️': 'tag',
+    '🏷': 'tag',
+    '👋': 'wave',
+    '🌍': 'servers',
+    '📡': 'stream',
+    '🎉': 'tada',
+    '💡': 'bulb',
+    '🔁': 'repeat',
+    '🔀': 'shuffle',
+    '👑': 'vip',
+    '💎': 'gem',
+    '⚡': 'bolt',
+    '❓': 'help',
+    '📜': 'queue',
+    '📻': 'autoplay',
+    '⏱️': 'clock',
+    '⏱': 'clock',
+    '👤': 'user',
+    '💬': 'chat',
+    '➕': 'add',
+    '🔊': 'volume',
+    '🎵': 'playing',
+    '🎶': 'note'
+  };
+
+  let result = text;
+  for (const [unicodeEmoji, key] of Object.entries(emojiMap)) {
+    const custom = formatEmoji(key);
+    if (custom && custom !== unicodeEmoji && custom !== '🎵') {
+      result = result.replaceAll(unicodeEmoji, custom);
+    }
+  }
+  return result;
+}
+
 /**
  * Monta embeds limpos e padronizados sem poluição visual excessiva.
  */
@@ -119,16 +168,29 @@ function createStatusEmbed({
   authorName = null,
   footerText = null,
   thumbnail = null,
-  fields = null
+  fields = null,
+  formatEmoji = null
 }) {
   const embed = new EmbedBuilder().setColor(COLOR_BY_TYPE[type] || EMBED_COLOR);
 
-  if (authorName) {
-    embed.setAuthor({ name: authorName, iconURL: botAvatarUrl || undefined });
+  const cleanTitle = applyBotEmojis(title, formatEmoji);
+  const cleanDescription = applyBotEmojis(description, formatEmoji);
+  const cleanAuthor = applyBotEmojis(authorName, formatEmoji);
+
+  if (cleanAuthor) {
+    embed.setAuthor({ name: cleanAuthor, iconURL: botAvatarUrl || undefined });
   }
-  if (title) embed.setTitle(title);
-  if (description) embed.setDescription(description);
-  if (Array.isArray(fields) && fields.length > 0) embed.addFields(fields);
+  if (cleanTitle) embed.setTitle(cleanTitle);
+  if (cleanDescription) embed.setDescription(cleanDescription);
+  if (Array.isArray(fields) && fields.length > 0) {
+    embed.addFields(
+      fields.map((f) => ({
+        name: applyBotEmojis(f.name, formatEmoji),
+        value: applyBotEmojis(f.value, formatEmoji),
+        inline: Boolean(f.inline)
+      }))
+    );
+  }
   if (thumbnail) embed.setThumbnail(thumbnail);
   if (footerText) {
     embed.setFooter({ text: footerText, iconURL: botAvatarUrl || undefined });

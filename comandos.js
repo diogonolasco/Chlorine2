@@ -104,6 +104,7 @@ function createCommandsModule({
   function statusEmbed(opts) {
     return createStatusEmbed({
       botAvatarUrl: getBotAvatarUrl(),
+      formatEmoji: formatPlayerEmoji,
       ...opts
     });
   }
@@ -200,7 +201,7 @@ function createCommandsModule({
         .setLabel('Acessar Painel Web')
         .setStyle(ButtonStyle.Link)
         .setURL(websiteUrl)
-        .setEmoji('🌐'),
+        .setEmoji(emojiManager.getEmoji('web')),
       new ButtonBuilder()
         .setLabel('Entrar no Servidor Oficial')
         .setStyle(ButtonStyle.Link)
@@ -421,17 +422,17 @@ function createCommandsModule({
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel('Acessar Painel Web')
-        .setEmoji('🌐')
+        .setEmoji(emojiManager.getEmoji('web'))
         .setStyle(ButtonStyle.Link)
         .setURL(websiteUrl),
       new ButtonBuilder()
         .setLabel('Me Adicionar')
-        .setEmoji('➕')
+        .setEmoji(emojiManager.getEmoji('add'))
         .setStyle(ButtonStyle.Link)
         .setURL(inviteUrl),
       new ButtonBuilder()
         .setLabel('Servidor Oficial')
-        .setEmoji('💬')
+        .setEmoji(emojiManager.getEmoji('chat'))
         .setStyle(ButtonStyle.Link)
         .setURL(supportUrl)
     );

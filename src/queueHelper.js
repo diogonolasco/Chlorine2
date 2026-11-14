@@ -64,7 +64,7 @@ function buildQueueMessagePayload(
   } = {}
 ) {
   const playingIcon = resolveIcon(formatEmoji, 'playing', '▶️');
-  const helpIcon = resolveIcon(formatEmoji, 'help', '💡');
+  const helpIcon = resolveIcon(formatEmoji, 'bulb', '💡');
   const songs = Array.isArray(queue?.songs) ? queue.songs : [];
   const currentSong = songs[0];
   const lines = [];

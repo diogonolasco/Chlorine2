@@ -17,7 +17,25 @@ const PLAYER_EMOJI_DEFS = [
   { key: 'volume', name: 'chlorine_volume', file: 'chlorine_volume.png', fallback: '🔊' },
   { key: 'autoplay', name: 'chlorine_autoplay', file: 'chlorine_autoplay.png', fallback: '📻' },
   { key: 'clock', name: 'chlorine_clock', file: 'chlorine_clock.png', fallback: '⏱️' },
-  { key: 'user', name: 'chlorine_user', file: 'chlorine_user.png', fallback: '👤' }
+  { key: 'user', name: 'chlorine_user', file: 'chlorine_user.png', fallback: '👤' },
+  { key: 'cross', name: 'chlorine_cross', file: 'chlorine_cross.png', fallback: '❌' },
+  { key: 'check', name: 'chlorine_check', file: 'chlorine_check.png', fallback: '✅' },
+  { key: 'warn', name: 'chlorine_warn', file: 'chlorine_warn.png', fallback: '⚠️' },
+  { key: 'web', name: 'chlorine_web', file: 'chlorine_web.png', fallback: '🌐' },
+  { key: 'lock', name: 'chlorine_lock', file: 'chlorine_lock.png', fallback: '🔒' },
+  { key: 'unlock', name: 'chlorine_unlock', file: 'chlorine_unlock.png', fallback: '🔓' },
+  { key: 'sparkles', name: 'chlorine_sparkles', file: 'chlorine_sparkles.png', fallback: '✨' },
+  { key: 'calendar', name: 'chlorine_calendar', file: 'chlorine_calendar.png', fallback: '📅' },
+  { key: 'tag', name: 'chlorine_tag', file: 'chlorine_tag.png', fallback: '🏷️' },
+  { key: 'wave', name: 'chlorine_wave', file: 'chlorine_wave.png', fallback: '👋' },
+  { key: 'servers', name: 'chlorine_servers', file: 'chlorine_servers.png', fallback: '🌍' },
+  { key: 'stream', name: 'chlorine_stream', file: 'chlorine_stream.png', fallback: '📡' },
+  { key: 'add', name: 'chlorine_add', file: 'chlorine_add.png', fallback: '➕' },
+  { key: 'chat', name: 'chlorine_chat', file: 'chlorine_chat.png', fallback: '💬' },
+  { key: 'tada', name: 'chlorine_tada', file: 'chlorine_tada.png', fallback: '🎉' },
+  { key: 'bulb', name: 'chlorine_bulb', file: 'chlorine_bulb.png', fallback: '💡' },
+  { key: 'repeat', name: 'chlorine_repeat', file: 'chlorine_repeat.png', fallback: '🔁' },
+  { key: 'shuffle', name: 'chlorine_shuffle', file: 'chlorine_shuffle.png', fallback: '🔀' }
 ];
 
 const DEF_BY_KEY = new Map(PLAYER_EMOJI_DEFS.map((d) => [d.key, d]));

@@ -62,5 +62,77 @@
   "user": {
     "id": "1570281420570501180",
     "name": "chlorine_user"
+  },
+  "cross": {
+    "id": "1571094225595011135",
+    "name": "chlorine_cross"
+  },
+  "check": {
+    "id": "1571094227386110023",
+    "name": "chlorine_check"
+  },
+  "warn": {
+    "id": "1571094228732354692",
+    "name": "chlorine_warn"
+  },
+  "web": {
+    "id": "1571094230078591157",
+    "name": "chlorine_web"
+  },
+  "lock": {
+    "id": "1571094231596929044",
+    "name": "chlorine_lock"
+  },
+  "unlock": {
+    "id": "1571094232486125619",
+    "name": "chlorine_unlock"
+  },
+  "sparkles": {
+    "id": "1571094234012848282",
+    "name": "chlorine_sparkles"
+  },
+  "calendar": {
+    "id": "1571094235707605022",
+    "name": "chlorine_calendar"
+  },
+  "tag": {
+    "id": "1571094236957515887",
+    "name": "chlorine_tag"
+  },
+  "wave": {
+    "id": "1571094238144499824",
+    "name": "chlorine_wave"
+  },
+  "servers": {
+    "id": "1571094239386013767",
+    "name": "chlorine_servers"
+  },
+  "stream": {
+    "id": "1571094240543641675",
+    "name": "chlorine_stream"
+  },
+  "add": {
+    "id": "1571094242082955305",
+    "name": "chlorine_add"
+  },
+  "chat": {
+    "id": "1571094243429064834",
+    "name": "chlorine_chat"
+  },
+  "tada": {
+    "id": "1571094244662312990",
+    "name": "chlorine_tada"
+  },
+  "bulb": {
+    "id": "1571094245933187162",
+    "name": "chlorine_bulb"
+  },
+  "repeat": {
+    "id": "1571094247073906722",
+    "name": "chlorine_repeat"
+  },
+  "shuffle": {
+    "id": "1571094248621744158",
+    "name": "chlorine_shuffle"
   }
 }
