@@ -810,11 +810,12 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
     if (!queue) {
       const remoteQueue = queueSyncManager.getRemoteQueue(guildId);
       if (remoteQueue) {
-        queueSyncManager.enqueueRemoteCommand(guildId, 'autoplay', {});
+        remoteQueue.autoplay = !remoteQueue.autoplay;
+        queueSyncManager.enqueueRemoteCommand(guildId, 'autoplay', { enabled: remoteQueue.autoplay });
         return res.json({
           success: true,
-          autoplay: !remoteQueue.autoplay,
-          message: `Autoplay ${!remoteQueue.autoplay ? 'Ativado' : 'Desativado'}!`
+          autoplay: remoteQueue.autoplay,
+          message: `Autoplay ${remoteQueue.autoplay ? 'Ativado' : 'Desativado'}!`
         });
       }
       return res.status(400).json({ error: 'Nenhuma música tocando neste servidor!' });
@@ -838,6 +839,7 @@ function createDashboardServer(client, distube, port = 3000, { quiet = false, te
         const currentMode = typeof remoteQueue.repeatMode === 'number' ? remoteQueue.repeatMode : 0;
         const requestedMode = mode !== undefined && mode !== null ? parseInt(mode, 10) : (currentMode + 1) % 3;
         const targetMode = [0, 1, 2].includes(requestedMode) ? requestedMode : 0;
+        remoteQueue.repeatMode = targetMode;
         queueSyncManager.enqueueRemoteCommand(guildId, 'repeat', { mode: targetMode });
         const labels = { 0: 'Desligado', 1: 'Repetir Música Atual', 2: 'Repetir Toda a Fila' };
         return res.json({ success: true, repeatMode: targetMode, message: `Repetição: ${labels[targetMode] || 'Desligado'}!` });

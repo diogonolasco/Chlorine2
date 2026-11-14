@@ -566,10 +566,10 @@ function renderQueueList(songs) {
 
     item.innerHTML = `
       <span class="queue-item-num">${badgeLabel}</span>
-      <img src="${escapeHtml(thumbUrl)}" alt="Thumb" class="queue-item-thumb">
+      <img src="${escapeHtml(thumbUrl)}" alt="Capa" class="queue-item-thumb" loading="lazy" onerror="this.src='${DEFAULT_ICON_URL}'">
       <div class="queue-item-info">
-        <h5>${escapeHtml(song.name)}</h5>
-        <span>⏱️ ${escapeHtml(song.formattedDuration)} • 👤 ${escapeHtml(song.user)}</span>
+        <h5 title="${escapeHtml(song.name)}">${escapeHtml(song.name)}</h5>
+        <span>⏱️ <strong>${escapeHtml(song.formattedDuration || '00:00')}</strong> • 👤 ${escapeHtml(song.user || 'Membro')}</span>
       </div>
       ${actionsHtml}
     `;
@@ -771,6 +771,8 @@ function setupPlayerControls() {
   // Repeat Mode Toggle
   document.getElementById('btn-repeat').addEventListener('click', async () => {
     if (!currentGuildId) return;
+    const repeatBtn = document.getElementById('btn-repeat');
+    const repeatText = document.getElementById('repeat-text');
     try {
       const res = await fetch('/api/player/repeat', {
         method: 'POST',
@@ -780,16 +782,31 @@ function setupPlayerControls() {
       const data = await res.json();
       if (data.success) {
         showToast(data.message);
-        loadGuildQueue(currentGuildId);
+        if (typeof data.repeatMode === 'number') {
+          const repeatModes = { 0: 'Repetir: OFF', 1: 'Repetir: Música', 2: 'Repetir: Fila' };
+          repeatText.textContent = repeatModes[data.repeatMode] || 'Repetir: OFF';
+          repeatBtn.classList.toggle('active', data.repeatMode > 0);
+        }
+        setTimeout(() => loadGuildQueue(currentGuildId, true), 300);
       }
     } catch {
       showToast('Erro ao alternar repetição', true);
     }
   });
 
-  // Autoplay Toggle (VIP)
+  // Autoplay Toggle (VIP) com atualização otimista imediata na tela
   document.getElementById('btn-autoplay').addEventListener('click', async () => {
     if (!currentGuildId) return;
+    const autoplayBtn = document.getElementById('btn-autoplay');
+    const autoplayText = document.getElementById('autoplay-text');
+
+    const isCurrentlyActive = autoplayBtn.classList.contains('active');
+    const nextState = !isCurrentlyActive;
+
+    // Atualização otimista instantânea
+    autoplayBtn.classList.toggle('active', nextState);
+    autoplayText.textContent = `Autoplay: ${nextState ? 'ON' : 'OFF'}`;
+
     try {
       const res = await fetch('/api/player/autoplay', {
         method: 'POST',
@@ -799,9 +816,19 @@ function setupPlayerControls() {
       const data = await res.json();
       if (data.success) {
         showToast(data.message);
-        loadGuildQueue(currentGuildId);
+        const finalAutoplay = typeof data.autoplay === 'boolean' ? data.autoplay : nextState;
+        autoplayBtn.classList.toggle('active', finalAutoplay);
+        autoplayText.textContent = `Autoplay: ${finalAutoplay ? 'ON' : 'OFF'}`;
+        setTimeout(() => loadGuildQueue(currentGuildId, true), 300);
+      } else {
+        // Reverte se a API retornou erro
+        autoplayBtn.classList.toggle('active', isCurrentlyActive);
+        autoplayText.textContent = `Autoplay: ${isCurrentlyActive ? 'ON' : 'OFF'}`;
+        showToast(data.error || 'Erro ao alternar autoplay', true);
       }
     } catch {
+      autoplayBtn.classList.toggle('active', isCurrentlyActive);
+      autoplayText.textContent = `Autoplay: ${isCurrentlyActive ? 'ON' : 'OFF'}`;
       showToast('Erro ao alternar autoplay', true);
     }
   });

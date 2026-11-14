@@ -200,7 +200,15 @@ async function executeRemoteCommandLocally(cmd, distube, client) {
         }
         break;
       case 'autoplay':
-        if (queue) queue.toggleAutoplay();
+        if (queue) {
+          if (typeof params.enabled === 'boolean') {
+            if (Boolean(queue.autoplay) !== params.enabled) {
+              queue.toggleAutoplay();
+            }
+          } else {
+            queue.toggleAutoplay();
+          }
+        }
         break;
       case 'repeat':
         if (queue && typeof params.mode === 'number') {
