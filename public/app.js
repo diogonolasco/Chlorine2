@@ -163,7 +163,7 @@ function renderMyVipGuilds(guilds) {
 
   guilds.forEach((g) => {
     const card = document.createElement('div');
-    card.className = 'guild-card';
+    card.className = 'guild-card guild-card-vip';
 
     const iconUrl = g.icon || DEFAULT_ICON_URL;
     const planName = g.vipInfo?.planName || 'VIP Ativo';
@@ -171,9 +171,9 @@ function renderMyVipGuilds(guilds) {
 
     card.innerHTML = `
       <div class="guild-card-header">
-        <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon">
+        <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon" onerror="this.src='${DEFAULT_ICON_URL}'">
         <div class="guild-card-title">
-          <h4>${escapeHtml(g.name)}</h4>
+          <h4 title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</h4>
           <span class="guild-card-id">${escapeHtml(g.id)}</span>
         </div>
       </div>
@@ -182,10 +182,10 @@ function renderMyVipGuilds(guilds) {
           <span>👥 Membros: <strong>${g.memberCount}</strong></span>
           <span class="pill-gold">👑 ${escapeHtml(planName)}</span>
         </div>
-        <div style="margin-top: 8px; font-size: 0.85rem; color: var(--gold-secondary)">
+        <div class="guild-card-time">
           ⏳ Tempo restante: <strong>${escapeHtml(remaining)}</strong>
         </div>
-        <div class="guild-card-voice" style="margin-top: 8px;">
+        <div class="guild-card-voice">
           🔊 Call Ativa: <strong>${escapeHtml(g.voiceChannelName || 'Nenhuma')}</strong>
         </div>
       </div>
@@ -318,15 +318,15 @@ function renderGuildsGrid(guilds) {
 
   guilds.forEach((g) => {
     const card = document.createElement('div');
-    card.className = 'guild-card';
+    card.className = g.isVip ? 'guild-card guild-card-vip' : 'guild-card';
 
     const iconUrl = g.icon || DEFAULT_ICON_URL;
     const vipBadge = g.isVip
-      ? '<span class="badge badge-gold">👑 VIP Ativo</span>'
+      ? '<span class="pill-gold">👑 VIP Ativo</span>'
       : '<span class="badge badge-normal">Normal</span>';
 
     const playingTag = g.hasActiveQueue
-      ? '<span class="pill-gold">🎵 Tocando Agora</span>'
+      ? '<span class="badge badge-gold">🎵 Tocando Agora</span>'
       : '<span style="color:var(--text-muted)">Parado</span>';
 
     const callInfo = g.voiceChannelName
@@ -335,9 +335,9 @@ function renderGuildsGrid(guilds) {
 
     card.innerHTML = `
       <div class="guild-card-header">
-        <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon">
+        <img src="${escapeHtml(iconUrl)}" alt="Ícone" class="guild-card-icon" onerror="this.src='${DEFAULT_ICON_URL}'">
         <div class="guild-card-title">
-          <h4>${escapeHtml(g.name)}</h4>
+          <h4 title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</h4>
           <span class="guild-card-id">${escapeHtml(g.id)}</span>
         </div>
       </div>
@@ -346,13 +346,13 @@ function renderGuildsGrid(guilds) {
           <span>👥 Membros: <strong>${g.memberCount}</strong></span>
           ${vipBadge}
         </div>
-        <div class="guild-card-voice" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between;">
+        <div class="guild-card-voice">
           <span>Status: ${playingTag}</span>
           ${callInfo}
         </div>
       </div>
       <div class="guild-card-footer">
-        <button class="btn btn-outline btn-sm w-100 btn-select-guild" data-guild-id="${escapeHtml(g.id)}">
+        <button class="btn ${g.isVip ? 'btn-gold' : 'btn-outline'} btn-sm w-100 btn-select-guild" data-guild-id="${escapeHtml(g.id)}">
           🎛️ Abrir no Player
         </button>
       </div>

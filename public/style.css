@@ -17,6 +17,9 @@
   --cyan-secondary: #00B4D8;
   --cyan-glow: rgba(0, 216, 230, 0.45);
 
+  --purple-primary: #A855F7;
+  --purple-glow: rgba(168, 85, 247, 0.45);
+
   --text-primary: #F0F4F8;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
@@ -1022,49 +1025,179 @@ body {
 }
 
 /* ==============================================================
-   ABA 3: SERVIDORES CONECTADOS
+   CARDS DE SERVIDORES (VIP E CONECTADOS)
    ============================================================== */
 .guilds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  width: 100%;
 }
 
 .guild-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
-  padding: 16px;
+  background: rgba(14, 18, 27, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 18px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 14px;
   transition: var(--transition);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.guild-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--border-cyan), transparent);
+  opacity: 0.7;
 }
 
 .guild-card:hover {
+  transform: translateY(-3px);
   border-color: var(--cyan-primary);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 16px var(--cyan-glow);
 }
 
-.guild-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
+.guild-card.guild-card-vip {
+  border-color: rgba(255, 215, 0, 0.35);
+  background: linear-gradient(160deg, rgba(22, 26, 40, 0.95), rgba(12, 15, 24, 0.9));
+}
+
+.guild-card.guild-card-vip::before {
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  opacity: 1;
+}
+
+.guild-card.guild-card-vip:hover {
+  border-color: var(--gold-primary);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 22px var(--gold-glow);
+}
+
+.guild-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.guild-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   object-fit: cover;
-  background: #111;
+  background: #0d1117;
   border: 2px solid var(--border-cyan);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-.guild-info h4 {
-  font-size: 0.95rem;
+.guild-card.guild-card-vip .guild-card-icon {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 12px var(--gold-glow);
+}
+
+.guild-card-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.guild-card-title h4 {
+  font-size: 1rem;
   font-weight: 700;
   color: #FFF;
-  margin-bottom: 2px;
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
-.guild-members {
-  font-size: 0.78rem;
+.guild-card-id {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   color: var(--text-muted);
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+.guild-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+}
+
+.guild-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guild-card-meta strong {
+  color: #FFF;
+}
+
+.guild-card-time {
+  font-size: 0.8rem;
+  color: var(--gold-secondary);
+}
+
+.guild-card-time strong {
+  color: var(--gold-primary);
+}
+
+.guild-card-voice {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.guild-card-voice strong {
+  color: var(--cyan-primary);
+}
+
+.guild-card-footer {
+  width: 100%;
+  margin-top: auto;
+}
+
+.guild-card-footer .btn {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+}
+
+.guild-card .pill-gold {
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.guild-card .badge {
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  border-radius: 999px;
 }
 
 /* ==============================================================
@@ -1237,41 +1370,6 @@ body {
   to { box-shadow: 0 0 35px var(--gold-glow); }
 }
 
-/* Responsividade */
-@media (max-width: 1080px) {
-  .player-grid,
-  .vip-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .navbar {
-    padding: 14px 18px;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .queue-card {
-    max-height: 480px;
-  }
-}
-
-@media (max-width: 720px) {
-  .navbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .nav-tabs {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  .track-info-container {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .server-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
 /* ==============================================================
    ESTILOS DE AUTENTICAÇÃO DISCORD & PERFIL RBAC
    ============================================================== */
@@ -1429,4 +1527,351 @@ body {
   font-size: 0.85rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+/* ==============================================================
+   RESPONSIVIDADE COMPLETA (DESKTOP, TABLET & MOBILE)
+   ============================================================== */
+
+/* --- Telas Médias e Tablets (max-width: 1024px) --- */
+@media (max-width: 1024px) {
+  .player-grid,
+  .vip-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .queue-card {
+    max-height: 480px;
+  }
+  .navbar {
+    padding: 14px 20px;
+    gap: 14px;
+  }
+}
+
+/* --- Tablets e Celulares (max-width: 768px) --- */
+@media (max-width: 768px) {
+  .navbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand right"
+      "tabs tabs";
+    padding: 12px 14px;
+    gap: 12px 10px;
+  }
+
+  .nav-brand {
+    grid-area: brand;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .brand-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  .brand-text h1 {
+    font-size: 1.15rem;
+  }
+
+  .brand-text p {
+    font-size: 0.65rem;
+  }
+
+  .nav-right {
+    grid-area: right;
+    gap: 8px;
+  }
+
+  .nav-tabs {
+    grid-area: tabs;
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 4px;
+    gap: 6px;
+    border-radius: var(--radius-md);
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    font-size: 0.84rem;
+  }
+
+  .container {
+    padding: 16px 14px;
+  }
+
+  .card {
+    padding: 16px 14px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Barra de Servidor */
+  .server-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .server-bar-left {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .server-bar-right {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Tocando Agora */
+  .track-info-container {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+  }
+
+  .track-thumb-wrapper {
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+  }
+
+  .track-title {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+
+  .track-meta {
+    text-align: center;
+  }
+
+  .player-controls {
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .ctrl-btn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 14px;
+  }
+
+  .ctrl-btn.btn-cyan-soft,
+  .ctrl-btn.btn-gold {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+    font-size: 0.8rem;
+    padding: 10px 8px;
+  }
+
+  .volume-control {
+    width: 100%;
+  }
+
+  .custom-slider {
+    height: 8px;
+  }
+
+  /* Formulário de Tocar Música & Call */
+  .quick-play-form {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .quick-play-form .custom-input,
+  .quick-play-form .custom-select,
+  .quick-play-form .btn {
+    width: 100%;
+  }
+
+  .quick-voice-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .quick-voice-row .custom-select,
+  .quick-voice-row .btn {
+    width: 100%;
+  }
+
+  /* Fila de Músicas */
+  .queue-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .queue-toolbar {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .queue-toolbar .btn {
+    flex: 1;
+    padding: 8px 6px;
+    font-size: 0.78rem;
+    text-align: center;
+  }
+
+  .queue-card {
+    max-height: 420px;
+  }
+
+  /* Banners VIP e Auth */
+  .vip-banner-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+    padding: 20px 16px;
+  }
+
+  .vip-banner-img {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto;
+  }
+
+  .vip-perks-pills {
+    justify-content: center;
+  }
+
+  .auth-banner-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+    padding: 18px 16px;
+  }
+
+  .auth-banner-content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .auth-banner-card .btn {
+    width: 100%;
+  }
+
+  /* Grid de Servidores */
+  .guilds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  /* Tabelas */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
+  }
+
+  .custom-table {
+    min-width: 600px;
+  }
+}
+
+/* --- Smartphones e Telas Pequenas (max-width: 480px) --- */
+@media (max-width: 480px) {
+  .container {
+    padding: 12px 10px;
+  }
+
+  .navbar {
+    padding: 10px 12px;
+  }
+
+  .brand-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-text h1 {
+    font-size: 1rem;
+  }
+
+  .brand-text p {
+    font-size: 0.6rem;
+    letter-spacing: 0.5px;
+  }
+
+  .bot-info .bot-name {
+    display: none;
+  }
+
+  .bot-badge {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .user-badge {
+    padding: 3px 8px 3px 4px;
+    gap: 6px;
+  }
+
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .user-name {
+    max-width: 75px;
+    font-size: 0.78rem;
+  }
+
+  .btn-logout {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+  }
+
+  .btn-discord {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+
+  .guilds-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .plans-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .code-wrapper {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .code-wrapper .btn {
+    width: 100%;
+    padding: 10px;
+  }
+
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+    text-align: center;
+    transform: translateY(120px);
+  }
 }
